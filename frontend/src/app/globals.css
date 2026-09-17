@@ -39,6 +39,11 @@
   --color-alert: #9c2f26;
   --color-alert-wash: #fbeceb;
 
+  /* Rain. The only blue in the palette, so weather reads as weather and is not
+     mistaken for the crew's black marker or for faint grey chrome. Held at 3:1
+     against the white surface, the floor for a graphic that carries meaning. */
+  --color-rain: #5a9fd4;
+
   --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
   --font-doc: var(--font-plex-serif), ui-serif, Georgia, serif;
 }

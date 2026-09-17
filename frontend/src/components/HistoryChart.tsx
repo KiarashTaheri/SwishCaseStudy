@@ -161,7 +161,16 @@ export function HistoryChart({ history, breakEvenPct }: HistoryChartProps) {
           )}
           {history.map((point, index) =>
             (point.rain_mm ?? 0) >= WASHING_RAIN_MM ? (
-              <EventTick key={`rain-${point.date}`} x={x(index)} kind="rain" />
+              // Both resets can land on one day (3 plant-days in the dataset).
+              // The drop is drawn last and would otherwise sit exactly on top of
+              // the crew's square and hide it — and a paid wash is not the same
+              // event as free rain. Stack it above instead.
+              <EventTick
+                key={`rain-${point.date}`}
+                x={x(index)}
+                kind="rain"
+                lift={point.cleaned ? CLEANED_SIZE + 2 : 0}
+              />
             ) : null,
           )}
 
@@ -250,30 +259,69 @@ export function HistoryChart({ history, breakEvenPct }: HistoryChartProps) {
           }
           label="withheld day, no estimate"
         />
-        <LegendKey
-          swatch={<span className="h-3 w-px bg-ink-faint" />}
-          label={`rain ≥ ${WASHING_RAIN_MM} mm`}
-        />
+        <LegendKey swatch={<RaindropSwatch />} label={`rain ≥ ${WASHING_RAIN_MM} mm`} />
         <LegendKey swatch={<span className="h-2 w-2 bg-ink" />} label="cleaned" />
       </figcaption>
     </figure>
   );
 }
 
-function EventTick({ x, kind }: { x: number; kind: "rain" | "cleaned" }) {
+/*
+ * A raindrop: round bottom, pointed top. Rain and cleaning both reset a plant,
+ * so the two markers sit on the same baseline and are told apart by shape alone
+ * — the square is a crew, the drop is weather. A plain tick read as neither.
+ *
+ * Drawn from the tip down both flanks into a semicircle of radius `r` centred
+ * `r` above the baseline, so the drop rests on the axis rather than crossing it.
+ */
+const DROP_RADIUS = 3.5;
+const DROP_HEIGHT = 11;
+/** The crew's marker. Square, so shape alone separates it from the drop. */
+const CLEANED_SIZE = 7;
+
+function raindropPath(cx: number, baseline: number): string {
+  const cy = baseline - DROP_RADIUS;
+  const tip = baseline - DROP_HEIGHT;
+  const waist = (cy - tip) * 0.45;
+  return [
+    `M ${cx} ${tip}`,
+    `C ${cx + DROP_RADIUS * 0.62} ${tip + waist} ${cx + DROP_RADIUS} ${cy - waist * 0.5} ${cx + DROP_RADIUS} ${cy}`,
+    `A ${DROP_RADIUS} ${DROP_RADIUS} 0 1 1 ${cx - DROP_RADIUS} ${cy}`,
+    `C ${cx - DROP_RADIUS} ${cy - waist * 0.5} ${cx - DROP_RADIUS * 0.62} ${tip + waist} ${cx} ${tip}`,
+    "Z",
+  ].join(" ");
+}
+
+function EventTick({
+  x,
+  kind,
+  lift = 0,
+}: {
+  x: number;
+  kind: "rain" | "cleaned";
+  lift?: number;
+}) {
   const baseline = PADDING.top + PLOT_HEIGHT;
   if (kind === "cleaned") {
-    return <rect x={x - 3.5} y={baseline - 7} width="7" height="7" fill="var(--color-ink)" />;
+    return (
+      <rect
+        x={x - CLEANED_SIZE / 2}
+        y={baseline - CLEANED_SIZE}
+        width={CLEANED_SIZE}
+        height={CLEANED_SIZE}
+        fill="var(--color-ink)"
+      />
+    );
   }
+  return <path d={raindropPath(x, baseline - lift)} fill="var(--color-rain)" />;
+}
+
+/** The same drop as the chart, sized for the caption. */
+function RaindropSwatch() {
   return (
-    <line
-      x1={x}
-      y1={baseline}
-      x2={x}
-      y2={baseline - 9}
-      stroke="var(--color-ink-faint)"
-      strokeWidth="2"
-    />
+    <svg width="8" height="12" viewBox="0 0 8 12" aria-hidden className="shrink-0">
+      <path d={raindropPath(4, 11.5)} fill="var(--color-rain)" />
+    </svg>
   );
 }
 
