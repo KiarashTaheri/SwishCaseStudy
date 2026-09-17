@@ -17,6 +17,13 @@ PORT="${PORT:-8000}"
 API="http://127.0.0.1:${PORT}"
 API_PID=""
 
+# A throwaway database, not backend/swishos.db. `dispatch` holds human decisions
+# and a rebuild deliberately does not erase it, so a developer who has clicked
+# through the UI has dispatch rows that make /api/fleet legitimately differ from
+# the committed fixture. That is the system behaving correctly and the check
+# being wrong, so the check gets its own database.
+SMOKE_DB="$(mktemp -d)/swishos.db"
+
 pass() { printf '  \033[32mok\033[0m   %s\n' "$1"; }
 fail() { printf '  \033[31mFAIL\033[0m %s\n' "$1"; exit 1; }
 step() { printf '\n\033[1m%s\033[0m\n' "$1"; }
@@ -26,6 +33,8 @@ cleanup() {
     kill "$API_PID" 2>/dev/null || true
     wait "$API_PID" 2>/dev/null || true
   fi
+  [[ -n "${SMOKE_DB:-}" ]] && rm -rf "$(dirname "$SMOKE_DB")"
+  return 0
 }
 trap cleanup EXIT
 
@@ -44,7 +53,7 @@ cd backend
 ./.venv/bin/pip install --quiet -r requirements.txt
 PY="./.venv/bin/python"
 
-PYTHONPATH=. $PY -m swishos.build --data ../data --db swishos.db >/dev/null
+PYTHONPATH=. $PY -m swishos.build --data ../data --db "$SMOKE_DB" >/dev/null
 pass "database built"
 
 PYTHONPATH=. $PY -m pytest -q >/dev/null || fail "pytest suite failed"
@@ -55,7 +64,7 @@ PYTHONPATH=. $PY scripts/verify.py >/dev/null 2>&1 \
   || printf '  \033[33mskip\033[0m scripts/verify.py not present or failed\n'
 
 step "3. API"
-PYTHONPATH=. $PY -m uvicorn swishos.api:app --port "$PORT" --log-level warning &
+SWISHOS_DB="$SMOKE_DB" PYTHONPATH=. $PY -m uvicorn swishos.api:app --port "$PORT" --log-level warning &
 API_PID=$!
 for _ in $(seq 1 40); do
   curl -sf "${API}/api/health" >/dev/null 2>&1 && break

@@ -302,3 +302,36 @@ class TestSnapshotIsImmutable:
             assert stored.snapshot["soiling_loss_pct"] != 99.0
         finally:
             connection.close()
+
+
+class TestConcurrency:
+    """The fleet view is opened by ~120 people in a burst after 8am.
+
+    SQLite connections carry a thread guard, and FastAPI serves sync endpoints
+    from a threadpool without promising that a dependency and the endpoint
+    depending on it run on the same thread. That combination produced an
+    intermittent `sqlite3.ProgrammingError` in the browser that curl and a
+    single-threaded test both missed, so the regression has to be genuinely
+    concurrent.
+    """
+
+    def test_endpoints_survive_parallel_requests(self, client):
+        import concurrent.futures
+
+        paths = [
+            "/api/health",
+            "/api/fleet",
+            "/api/plants/plant_1000",
+            "/api/plants/plant_1003",
+            "/api/dispatches",
+        ] * 8
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=12) as pool:
+            responses = list(pool.map(client.get, paths))
+
+        failures = [
+            (r.request.url.path, r.status_code, r.text[:200])
+            for r in responses
+            if r.status_code != 200
+        ]
+        assert not failures, failures

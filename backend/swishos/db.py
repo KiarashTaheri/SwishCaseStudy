@@ -139,8 +139,21 @@ def connect(database_path: Path | str) -> sqlite3.Connection:
     WAL is required, not cosmetic: readers must not block on the daily ingest
     write. Foreign keys are off by default in SQLite and must be enabled per
     connection, so the REFERENCES clauses above are inert without this.
+
+    `check_same_thread=False` is required by how the API serves requests, and is
+    safe only because of how it hands connections out. FastAPI runs a sync
+    dependency and the sync endpoint that depends on it in a threadpool, and
+    makes no promise they land on the same thread — so a connection opened in
+    the dependency and used in the endpoint trips SQLite's default thread guard
+    even though only one thread ever touches it. The guard is checking thread
+    *identity*; what actually matters is concurrent *use*, and `api.py` gives
+    every request its own connection and closes it when the request ends.
+
+    This was a real bug, not a theoretical one: `GET /api/plants/{id}` failed
+    intermittently in the browser while passing under curl and under the test
+    suite. `tests/test_api.py::TestConcurrency` is the regression.
     """
-    connection = sqlite3.connect(str(database_path))
+    connection = sqlite3.connect(str(database_path), check_same_thread=False)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA journal_mode=WAL")
     connection.execute("PRAGMA foreign_keys=ON")

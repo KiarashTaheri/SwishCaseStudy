@@ -60,9 +60,24 @@ app = FastAPI(
 # The frontend dev server only. A wildcard would be one line shorter and would
 # also let any page on the internet read this fleet's economics from a browser
 # that can reach the API.
+#
+# 3001 is listed because `next dev` silently falls back to it when 3000 is
+# taken, which is the normal state of any machine already running something
+# there. Without it the UI loads, fails its fetch, and quietly shows the bundled
+# sample — the failure mode hardest to notice, because the screen still works.
+# Override with SWISHOS_CORS_ORIGINS for any other port.
+DEV_ORIGINS = [
+    f"http://{host}:{port}"
+    for host in ("localhost", "127.0.0.1")
+    for port in (3000, 3001)
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=(
+        os.environ["SWISHOS_CORS_ORIGINS"].split(",")
+        if os.environ.get("SWISHOS_CORS_ORIGINS")
+        else DEV_ORIGINS
+    ),
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )

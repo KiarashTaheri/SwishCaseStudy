@@ -36,6 +36,12 @@ nothing else changes. Set the key to enable it.
 **The frontend runs without the backend.** If the API is unreachable it serves a bundled sample and
 says so in a banner, so the UI can be demonstrated on its own.
 
+**If something already owns port 3000**, `next dev` falls back to 3001 without stopping. The API
+allows both origins, so this works either way; for any other port, set
+`SWISHOS_CORS_ORIGINS=http://localhost:3002` when starting the backend. Without it the page loads,
+the fetch fails silently on CORS, and you get the bundled sample with the banner — which is the
+system behaving correctly, but not what you wanted to see.
+
 ### Verify the numbers
 
 ```bash
