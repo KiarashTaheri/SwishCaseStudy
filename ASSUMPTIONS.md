@@ -77,8 +77,18 @@ Referenced from the decision log as `[A#]`.
 | **Assumption** | Crew `day_rate_usd` is already inside `cleaning_cost_usd` and must not be added again. |
 | **Source** | *Not stated anywhere in the brief* — a guess, and the one I am least comfortable with. *Measured* evidence below is genuinely ambiguous. |
 | **Rejected** | Adding `day_rate_usd` on top. If crew cost were additional, Rajasthan cleaning would cost nearly double its stated figure, which seems unlikely — but the evidence does not settle it. |
-| **Cost** | *Measured*: adding each plant's suggested crew-days at its region's day rate flips **2 of the 4 current recommendations** negative — `plant_1005` +$224 → −$3,914 (3.0 crew-days × $1,379) and `plant_1006` +$3,409 → −$10,255 (5.3 × $2,578). `plant_1000` and `plant_1008` survive. So the ambiguity does not merely shift the numbers; it halves tomorrow's dispatch list. |
+| **Cost** | *Measured*: adding each plant's suggested crew-days at its region's day rate flips **3 of the 5 current recommendations** negative, and takes the fleet total from **$44,719 to $28,554**. The ambiguity does not merely shift the numbers; it removes most of tomorrow's dispatch list. Table below. |
 | **Falsifier** | One email. The brief invites questions and this is what I would spend one on. |
+
+What each recommendation is worth if the day rate turns out to be additive:
+
+| Plant | Recoverable | Suggested crew | Crew cost | Net if A5 is wrong |
+|---|---|---|---|---|
+| `plant_1000` | $29,674 | 3.4 d × $1,379 | $4,690 | +$24,985 |
+| `plant_1008` | $8,911 | 2.9 d × $1,842 | $5,342 | +$3,569 |
+| `plant_1006` | $4,259 | 5.3 d × $2,578 | $13,664 | **−$9,405** |
+| `plant_1005` | $1,692 | 3.0 d × $1,379 | $4,138 | **−$2,445** |
+| `plant_1001` | $182 | 4.7 d × $2,578 | $12,117 | **−$11,935** |
 
 Implied crew cost (`day_rate_usd / mw_per_day`) against `cleaning_cost_usd / capacity_mw`:
 
@@ -172,7 +182,7 @@ by the 120-day window:
 | **Assumption** | The event log is complete, so "days since last reset" is correct. |
 | **Source** | *Inferred* from it being presented as the event log. |
 | **Rejected** | Inferring resets from PR jumps instead of the event log. Worth adding as a cross-check rather than a replacement. |
-| **Cost** | An unrecorded clean makes the window span a reset — the exact failure that costs $52,052 on `plant_1010` (Decision 2). Silent and dangerous. |
+| **Cost** | Small, and smaller than it was. While the estimator ran a multi-day window, an unrecorded reset let that window average a dirty plant with a clean one — the failure that justified a reset-boundary rule. Deleting the window (Decision 2) deleted that exposure with it: `s₀` is today's gated reading, and a plant washed yesterday simply reads clean today, which is correct whether or not the wash was logged. What remains is `r`, `days_since_reset` and `last_reset_on`. *Measured*: discarding `events.csv` **entirely** moves `r` by at most **0.035 pp/day** (`plant_1009`, 0.065 → 0.030) and never by more than 0.025 on any plant the system currently recommends — the median over day-over-day pairs absorbs the spurious negative. `r` does not value a cleaning (it cancels), so nothing here reaches `recoverable_usd`. It reaches "how soon does this become worth cleaning", and the interface's stated reset date. |
 | **Falsifier** | A PR jump with no corresponding event row. Detectable, and a good addition to the gate. |
 
 ---

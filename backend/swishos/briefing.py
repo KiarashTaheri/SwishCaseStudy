@@ -24,7 +24,7 @@ Two hard rules, enforced on both paths:
    `source` says `"template"`. The template is written first and is the thing
    under test; the model is an enhancement to it, not a dependency.
 
-See ASSUMPTIONS.md A3 and DECISIONS.md #10.
+See ASSUMPTIONS.md A3 and DECISIONS.md #6.
 """
 
 from __future__ import annotations

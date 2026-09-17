@@ -8,6 +8,7 @@ import { DispatchPanel } from "@/components/DispatchPanel";
 import { HistoryChart } from "@/components/HistoryChart";
 import { KpiCard } from "@/components/KpiCard";
 import { PageHeader } from "@/components/PageHeader";
+import { PaybackChart } from "@/components/PaybackChart";
 import { fetchPlant, type DataSource } from "@/lib/api";
 import type { PlantDetail } from "@/lib/contract";
 import { verdictFor } from "@/lib/decision";
@@ -164,6 +165,14 @@ export default function PlantPage() {
             history={plant.history}
             breakEvenPct={plant.break_even_soiling_pct}
           />
+        </div>
+
+        {/* The chart above answers "is it dirty enough". This one answers the
+            question the asset manager is actually signing off on: what the
+            money does between today and the next rain. */}
+        <SectionLabel>What the wash costs, and what it returns</SectionLabel>
+        <div className="rounded-lg border border-rule bg-surface p-4">
+          <PaybackChart plant={plant} />
         </div>
 
         <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">

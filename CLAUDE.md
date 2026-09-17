@@ -39,7 +39,7 @@ defensible claim is narrower and fully measured: soiling *accumulates*, so a los
 overnight without a wash is not a loss a wash recovers.
 
 **Measured** (`scripts/verify.py`): gated soiling rises a median **0.240pp/day**, never more than
-**1.56pp**, and has never exceeded **11.74%** on a credible reading across 1,138 plant-days. Against
+**1.56pp**, and has never exceeded **11.74%** on a credible reading across 1,137 plant-days. Against
 that, 29 transitions move >20pp in one day — `plant_1000` goes 0.06% → 60.18% → 0.52% on consecutive
 days with no rain and no crew. 21 of 1,343 plant-days (1.6%) are withheld as availability anomalies
 and 206 (15.3%) in total, including one ranked at **+$1,498,102** while producing 2% of expected for

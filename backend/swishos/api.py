@@ -288,7 +288,7 @@ def _plant_row(
 
     Rounding happens here and only here, at the edge. Values are stored at full
     precision and presented at the precision the estimate actually carries —
-    two decimals on a percentage standing on a three-day median is already
+    two decimals on a percentage standing on a single gated reading is already
     generous, and more would be false confidence.
     """
     return {

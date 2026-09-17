@@ -1,11 +1,16 @@
 """SQLite connection management and schema.
 
-Why SQLite: at the stated end state (200 plants x 5 years retention) the daily
-rollups are 365,000 rows and 43.6 MB on disk, with the fleet ranking query
-measured at 32 ms. The deployment constraint is that the system runs from a
-clean clone with no hosted services, and `sqlite3` ships with Python. See
-DECISIONS.md #4 for the benchmark and for the conditions that would force
-Postgres.
+Why SQLite: generated at the stated end state (200 plants x 5 years), the daily
+rollups are 335,585 rows, the database is 93.4 MB, and the fleet ranking query
+runs in 0.22 ms. The deployment constraint is that the system runs from a clean
+clone with no hosted services, and `sqlite3` ships with Python. See DECISIONS.md
+#4 for the commands that reproduce those figures, what they do and do not
+establish, and the conditions that would force Postgres.
+
+The figure that matters for growth is `ranking_snapshot`, not `daily_reading`:
+a snapshot row is 369 bytes and one is written per plant per day, so retaining
+them for five years costs ~135 MB against the readings' 21.8 MB. Derived data
+outgrows source data here, and that table is the one that needs an expiry rule.
 
 Table layout follows DDIA ch.17's separation of source data from derived data:
 `plant`, `crew`, `daily_reading` and `plant_day_event` mirror the CSVs verbatim
