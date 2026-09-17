@@ -15,7 +15,7 @@ the system, framework choice) — those are mine to decide and defend.
 | 3 | How to treat plants commissioned mid-window? | Show them, flagged low-confidence |
 | 4 | Should `readings/` be used at all? | No — skipping it, per the brief |
 | 5 | Demonstrate the 200-plant run, or is the default enough? | Design for it, validate on the default |
-| 6 | Are crews constrained to their home region? | No — any crew, any plant |
+| 6 | Are crews constrained to their home region? | Yes — region is a hard partition |
 | 7 | Who are the ~120 people at 8am? | All seeing one shared fleet view |
 
 ---
@@ -63,10 +63,22 @@ changes storage and precomputation choices.
 
 ### 6. Should crews be constrained to their home region?
 
-**What I see** — `crews.csv` gives each crew a home base matching the plant regions, but there's no
-distance, travel time or mobilisation data.
+**What I see** — Every `home_base` suffix maps onto exactly one plant region: Antofagasta/CL is the
+Atacama port city, Jodhpur/RJ is in Rajasthan, Seville/ES in Andalusia, Townsville/QLD in Queensland,
+Phoenix and Tucson/AZ in Arizona. Five regions, six crews, Arizona holding two. There is no distance,
+travel time or mobilisation data.
 
-**Assuming** — Any crew can reach any plant. I rank on $ per crew-day.
+**Assuming** — A crew services only its own region. Flying the Jodhpur crew to Arizona is not a
+scheduling option, so region is a hard partition on the problem rather than an attribute of it.
+
+**Why it matters** — It changes the answer, not just the presentation. A single fleet-wide pool gives
+6.9 crew-days to clean everything, against a true per-region bottleneck of **10.5 crew-days in
+Rajasthan** — one crew, the slowest (10.2 MW/day) and most expensive ($2,578/day) in the fleet,
+against 106.8 MW of plant. A global ranking would also place a Chilean plant above a Rajasthan one
+and then offer a crew that cannot reach it. Plants compete only within their own region, so there is
+no fleet-wide ranking.
+
+**Tell me if wrong** — a documented multi-region remit for any crew would collapse the partition.
 
 ### 7. Who are the ~120 people loading the fleet view after 8am?
 

@@ -14,22 +14,33 @@ scope over shipping something you cannot justify — anything extra built is som
 ## Commands
 
 ```bash
-python3 seed_data.py                                          # regenerate data/ (12 plants x 120 days)
-python3 seed_data.py --plants 200 --days 540 --out data_scale  # scale run, ~530 MB, do not commit
+python3 seed_data.py --start 2026-05-18                        # regenerate data/ (12 plants x 120 days)
+python3 seed_data.py --plants 200 --days 540 --start 2026-05-18 --out data_scale  # scale run, ~530 MB
 ```
 
-`seed_data.py` is stdlib-only and deterministic for a given `--seed` (default `20260901`). Do not
-modify it — it is supplied by the exercise. Do not commit its output.
+**Always pass `--start`.** `seed_data.py:213` falls back to `date.today() - days` when it is omitted,
+so the dataset is only deterministic *on a given calendar day* — the row values are seeded and stable,
+but every date shifts. The committed fixtures and every date cited in the docs come from a run
+starting `2026-05-18` (last row `2026-09-14`). Without the pin, a clone tomorrow reproduces none of
+the cited dates.
 
-Backend is Python/FastAPI + SQLite, frontend Next.js/TypeScript. Neither runner is set up yet; there
-is no `pyproject.toml`, test suite or frontend scaffold at time of writing.
+`seed_data.py` is stdlib-only and deterministic for a given `--seed` (default `20260901`). Do not
+modify it — it is supplied by the exercise; pin via the flag only. Do not commit its output.
+
+Backend is Python/FastAPI + SQLite, frontend Next.js/TypeScript. `backend/pyproject.toml` and a
+pytest suite exist; `frontend/` is scaffolded. Run the backend suite with
+`cd backend && ./.venv/bin/python -m pytest -q`.
 
 ## The one thing to get right
 
 **`soiling_loss_pct` is not soiling.** It is total performance deficit against the last post-wash
 baseline, so everything that suppresses output lands in it. Feeding it to the economics unchanged
-dispatches trucks at plants cleaning cannot help — measured at 7.2% of plant-days, including one
-plant ranked at +$1,498,102 while producing 2% of expected for six days.
+dispatches trucks at plants cleaning cannot help. **Measured** (`scripts/verify.py`): 21 of 1,343
+plant-days (1.6%) are withheld as availability anomalies and 206 (15.3%) in total, including one
+plant ranked at **+$1,498,102** while producing 2% of expected for six days — plant_1003 on
+2026-07-07 at 97.99% reported loss, using that day's `expected_energy_kwh` ($1,280,573 against a
+14-day median E). An earlier draft of this file cited 7.2%; that figure does not reproduce under any
+definition tried and has been replaced with the measured rates.
 
 Consequences that propagate through the whole system:
 
@@ -49,7 +60,8 @@ Consequences that propagate through the whole system:
 - **Rain on day *d* affects soiling on day *d+1*.** The generator updates soiling after the day's
   generation. Keying a rain effect to the same day produces nonsense (it makes a ≥8 mm wash look
   like it does nothing).
-- **"Today" is the last row in `daily.csv`** (2026-09-14 in the default run), not wall-clock time.
+- **"Today" is the last row in `daily.csv`** (`2026-09-14` with the pinned `--start 2026-05-18`), not
+  wall-clock time — and not a fixed date either, unless the start is pinned. See Commands.
 - **Two plants are commissioned mid-window** with 56 and 87 days of history and almost no baseline.
 - **`readings/` is not ingested** — the brief says it isn't needed, and it is 530 MB at scale.
 
@@ -76,7 +88,7 @@ requires the system to run without one.
 
 | Symbol | Meaning | Source |
 |---|---|---|
-| `s₀` | today's soiling loss, % of expected output | gated 14-day median of `soiling_loss_pct` |
+| `s₀` | today's soiling loss, % of expected output | gated median of the 3 most recent usable days **since the last reset** |
 | `r` | accumulation rate, percentage points/day | estimated from dry-day rises |
 | `E` | expected generation, kWh/day | 14-day median of `expected_energy_kwh` |
 | `τ` | tariff, $/kWh | `tariff_per_kwh` |
