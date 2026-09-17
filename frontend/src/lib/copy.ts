@@ -1,0 +1,62 @@
+import type { PlantRow } from "@/lib/contract";
+import type { Verdict } from "@/lib/decision";
+import { formatDate, formatDays, formatUsd } from "@/lib/format";
+
+/**
+ * The words attached to each verdict, in one place so the row, the drawer and
+ * the confirmation cannot describe the same plant differently.
+ */
+
+/** Two or three words, sitting above the margin figure. */
+export function verdictTitle(verdict: Verdict): string {
+  switch (verdict.kind) {
+    case "CLEAR":
+      return "Past break-even";
+    case "MARGINAL":
+      return "Too close to call";
+    case "APPROACHING":
+      return "Coming up";
+    case "BELOW":
+      return "Below break-even";
+    case "NO_ESTIMATE":
+      return "No estimate";
+  }
+}
+
+/** One sentence a person can check against the numbers beside it. */
+export function verdictDetail(verdict: Verdict, plant: PlantRow): string {
+  switch (verdict.kind) {
+    case "CLEAR": {
+      const dollars =
+        plant.recoverable_usd === null
+          ? null
+          : `${formatUsd(plant.recoverable_usd)} recoverable before the next rain`;
+      const dust =
+        verdict.daysPastBreakEven === null
+          ? null
+          : `${formatDays(verdict.daysPastBreakEven)} of dust past break-even`;
+      return [dust, dollars].filter(Boolean).join(" · ");
+    }
+    case "MARGINAL": {
+      const dollars =
+        plant.recoverable_usd === null ? "" : ` Worth ${formatUsd(plant.recoverable_usd)}.`;
+      return `Under a day of dust separates this from break-even, which is inside the noise on the estimate.${dollars}`;
+    }
+    case "APPROACHING":
+      return `Crosses break-even in ${formatDays(verdict.daysToBreakEven)} at the current accumulation rate.`;
+    case "BELOW":
+      return verdict.daysToBreakEven === null
+        ? "Not worth cleaning before the next rain."
+        : `Break-even in ${formatDays(verdict.daysToBreakEven)} at the current accumulation rate.`;
+    case "NO_ESTIMATE":
+      return insufficientHistoryReason(plant, verdict.usableDays);
+  }
+}
+
+function insufficientHistoryReason(plant: PlantRow, usableDays: number): string {
+  const dayWord = usableDays === 1 ? "day" : "days";
+  const since = plant.last_reset_on
+    ? ` since the reset on ${formatDate(plant.last_reset_on)}`
+    : "";
+  return `${usableDays} usable ${dayWord}${since}; three are needed before soiling can be separated from noise.`;
+}

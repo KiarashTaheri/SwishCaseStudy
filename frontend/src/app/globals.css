@@ -1,26 +1,55 @@
 @import "tailwindcss";
 
+/* One fixed light theme. A dashboard read at 8am in an office needs the signal
+   colour to mean the same thing on every screen; a second palette doubles the
+   contrast surface to verify for no decision-making benefit. */
+@theme {
+  --color-paper: #eef1f2;
+  --color-surface: #ffffff;
+  --color-rule: #d2dade;
+  --color-rule-strong: #9fb0b7;
+
+  --color-ink: #10222b;
+  --color-ink-soft: #445d68;
+  --color-ink-faint: #748c96;
+
+  /* Reserved for "past break-even". Used nowhere else, so its presence on the
+     page is itself the recommendation. */
+  --color-signal: #b66a09;
+  --color-signal-wash: #f6e8d2;
+
+  --color-alert: #9c2f26;
+  --color-alert-wash: #f6e4e2;
+
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-doc: var(--font-plex-serif), ui-serif, Georgia, serif;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  color-scheme: light;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+}
+
+/* Figures are compared down a column within a region band; proportional digits
+   break that alignment. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
