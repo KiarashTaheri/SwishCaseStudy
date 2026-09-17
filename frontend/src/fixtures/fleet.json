@@ -1,0 +1,455 @@
+{
+  "as_of": "2026-09-14",
+  "summary": {
+    "plants_total": 12,
+    "actionable": 4,
+    "withheld": 8,
+    "total_recoverable_usd": 38184.81
+  },
+  "regions": [
+    {
+      "region": "Andalusia, Spain",
+      "crews": [
+        {
+          "crew_id": "crew_12",
+          "home_base": "Seville, ES",
+          "mw_per_day": 18.0,
+          "day_rate_usd": 1133.71
+        }
+      ],
+      "capacity_mw_per_day": 18.0,
+      "recommendations": [],
+      "withheld": [
+        {
+          "plant_id": "plant_1002",
+          "name": "Talara Alpha (002)",
+          "region": "Andalusia, Spain",
+          "capacity_mw": 72.0,
+          "status": "BELOW_BREAK_EVEN",
+          "soiling_loss_pct": 0.63,
+          "break_even_soiling_pct": 7.41,
+          "margin_pct": -6.78,
+          "recoverable_usd": -34257.9,
+          "cleaning_cost_usd": 37440.0,
+          "expected_energy_kwh_per_day": 422320.6,
+          "tariff_per_kwh": 0.092,
+          "days_until_next_reset": 13,
+          "accumulation_rate_pct_per_day": 0.12,
+          "days_to_break_even": 56.5,
+          "days_since_reset": 7,
+          "last_reset_on": "2026-09-07",
+          "usable_days": 3,
+          "quality": {
+            "withheld_days_last_14": 0,
+            "note": null
+          },
+          "suggested_crew": {
+            "crew_id": "crew_12",
+            "home_base": "Seville, ES",
+            "crew_days": 4.0
+          },
+          "dispatched": false
+        },
+        {
+          "plant_id": "plant_1007",
+          "name": "Bright Fork Alpha (007)",
+          "region": "Andalusia, Spain",
+          "capacity_mw": 4.3,
+          "status": "INSUFFICIENT_HISTORY",
+          "soiling_loss_pct": null,
+          "break_even_soiling_pct": 6.27,
+          "margin_pct": null,
+          "recoverable_usd": null,
+          "cleaning_cost_usd": 2236.0,
+          "expected_energy_kwh_per_day": 29819.3,
+          "tariff_per_kwh": 0.092,
+          "days_until_next_reset": 13,
+          "accumulation_rate_pct_per_day": 0.15,
+          "days_to_break_even": null,
+          "days_since_reset": 1,
+          "last_reset_on": "2026-09-13",
+          "usable_days": 1,
+          "quality": {
+            "withheld_days_last_14": 0,
+            "note": null
+          },
+          "suggested_crew": {
+            "crew_id": "crew_12",
+            "home_base": "Seville, ES",
+            "crew_days": 0.2
+          },
+          "dispatched": false
+        }
+      ]
+    },
+    {
+      "region": "Arizona, USA",
+      "crews": [
+        {
+          "crew_id": "crew_10",
+          "home_base": "Phoenix, AZ",
+          "mw_per_day": 12.9,
+          "day_rate_usd": 1569.06
+        },
+        {
+          "crew_id": "crew_15",
+          "home_base": "Tucson, AZ",
+          "mw_per_day": 20.1,
+          "day_rate_usd": 1379.3
+        }
+      ],
+      "capacity_mw_per_day": 33.0,
+      "recommendations": [
+        {
+          "plant_id": "plant_1000",
+          "name": "Sunfield Alpha (000)",
+          "region": "Arizona, USA",
+          "capacity_mw": 68.9,
+          "status": "ACTIONABLE",
+          "soiling_loss_pct": 5.23,
+          "break_even_soiling_pct": 2.94,
+          "margin_pct": 2.29,
+          "recoverable_usd": 25844.12,
+          "cleaning_cost_usd": 33072.0,
+          "expected_energy_kwh_per_day": 451323.4,
+          "tariff_per_kwh": 0.078,
+          "days_until_next_reset": 32,
+          "accumulation_rate_pct_per_day": 0.245,
+          "days_to_break_even": null,
+          "days_since_reset": 24,
+          "last_reset_on": "2026-08-21",
+          "usable_days": 3,
+          "quality": {
+            "withheld_days_last_14": 0,
+            "note": null
+          },
+          "suggested_crew": {
+            "crew_id": "crew_15",
+            "home_base": "Tucson, AZ",
+            "crew_days": 3.4
+          },
+          "dispatched": false
+        },
+        {
+          "plant_id": "plant_1005",
+          "name": "Lumen Alpha (005)",
+          "region": "Arizona, USA",
+          "capacity_mw": 61.3,
+          "status": "ACTIONABLE",
+          "soiling_loss_pct": 3.23,
+          "break_even_soiling_pct": 3.21,
+          "margin_pct": 0.02,
+          "recoverable_usd": 223.85,
+          "cleaning_cost_usd": 29424.0,
+          "expected_energy_kwh_per_day": 367744.5,
+          "tariff_per_kwh": 0.078,
+          "days_until_next_reset": 32,
+          "accumulation_rate_pct_per_day": 0.17,
+          "days_to_break_even": null,
+          "days_since_reset": 20,
+          "last_reset_on": "2026-08-25",
+          "usable_days": 3,
+          "quality": {
+            "withheld_days_last_14": 0,
+            "note": null
+          },
+          "suggested_crew": {
+            "crew_id": "crew_15",
+            "home_base": "Tucson, AZ",
+            "crew_days": 3.0
+          },
+          "dispatched": false
+        }
+      ],
+      "withheld": [
+        {
+          "plant_id": "plant_1010",
+          "name": "Meridian Alpha (010)",
+          "region": "Arizona, USA",
+          "capacity_mw": 72.9,
+          "status": "BELOW_BREAK_EVEN",
+          "soiling_loss_pct": 0.46,
+          "break_even_soiling_pct": 3.1,
+          "margin_pct": -2.64,
+          "recoverable_usd": -29798.12,
+          "cleaning_cost_usd": 34992.0,
+          "expected_energy_kwh_per_day": 452365.2,
+          "tariff_per_kwh": 0.078,
+          "days_until_next_reset": 32,
+          "accumulation_rate_pct_per_day": 0.165,
+          "days_to_break_even": 16.0,
+          "days_since_reset": 4,
+          "last_reset_on": "2026-09-10",
+          "usable_days": 3,
+          "quality": {
+            "withheld_days_last_14": 0,
+            "note": null
+          },
+          "suggested_crew": {
+            "crew_id": "crew_15",
+            "home_base": "Tucson, AZ",
+            "crew_days": 3.6
+          },
+          "dispatched": false
+        }
+      ]
+    },
+    {
+      "region": "Atacama, Chile",
+      "crews": [
+        {
+          "crew_id": "crew_13",
+          "home_base": "Antofagasta, CL",
+          "mw_per_day": 12.1,
+          "day_rate_usd": 1842.06
+        }
+      ],
+      "capacity_mw_per_day": 12.1,
+      "recommendations": [
+        {
+          "plant_id": "plant_1008",
+          "name": "Sandhill Alpha (008)",
+          "region": "Atacama, Chile",
+          "capacity_mw": 35.3,
+          "status": "ACTIONABLE",
+          "soiling_loss_pct": 4.47,
+          "break_even_soiling_pct": 3.18,
+          "margin_pct": 1.29,
+          "recoverable_usd": 8708.17,
+          "cleaning_cost_usd": 21533.0,
+          "expected_energy_kwh_per_day": 246461.3,
+          "tariff_per_kwh": 0.061,
+          "days_until_next_reset": 45,
+          "accumulation_rate_pct_per_day": 0.33,
+          "days_to_break_even": null,
+          "days_since_reset": 16,
+          "last_reset_on": "2026-08-29",
+          "usable_days": 3,
+          "quality": {
+            "withheld_days_last_14": 0,
+            "note": null
+          },
+          "suggested_crew": {
+            "crew_id": "crew_13",
+            "home_base": "Antofagasta, CL",
+            "crew_days": 2.9
+          },
+          "dispatched": false
+        }
+      ],
+      "withheld": [
+        {
+          "plant_id": "plant_1003",
+          "name": "Kestrel Alpha (003)",
+          "region": "Atacama, Chile",
+          "capacity_mw": 72.6,
+          "status": "BELOW_BREAK_EVEN",
+          "soiling_loss_pct": 2.03,
+          "break_even_soiling_pct": 3.68,
+          "margin_pct": -1.65,
+          "recoverable_usd": -19848.51,
+          "cleaning_cost_usd": 44286.0,
+          "expected_energy_kwh_per_day": 438549.1,
+          "tariff_per_kwh": 0.061,
+          "days_until_next_reset": 45,
+          "accumulation_rate_pct_per_day": 0.28,
+          "days_to_break_even": 5.9,
+          "days_since_reset": 9,
+          "last_reset_on": "2026-09-05",
+          "usable_days": 3,
+          "quality": {
+            "withheld_days_last_14": 0,
+            "note": null
+          },
+          "suggested_crew": {
+            "crew_id": "crew_13",
+            "home_base": "Antofagasta, CL",
+            "crew_days": 6.0
+          },
+          "dispatched": false
+        }
+      ]
+    },
+    {
+      "region": "Queensland, AUS",
+      "crews": [
+        {
+          "crew_id": "crew_14",
+          "home_base": "Townsville, QLD",
+          "mw_per_day": 9.4,
+          "day_rate_usd": 1771.33
+        }
+      ],
+      "capacity_mw_per_day": 9.4,
+      "recommendations": [],
+      "withheld": [
+        {
+          "plant_id": "plant_1004",
+          "name": "Ardent Alpha (004)",
+          "region": "Queensland, AUS",
+          "capacity_mw": 19.9,
+          "status": "BELOW_BREAK_EVEN",
+          "soiling_loss_pct": 0.6,
+          "break_even_soiling_pct": 14.08,
+          "margin_pct": -13.48,
+          "recoverable_usd": -10287.95,
+          "cleaning_cost_usd": 10746.0,
+          "expected_energy_kwh_per_day": 128305.8,
+          "tariff_per_kwh": 0.085,
+          "days_until_next_reset": 7,
+          "accumulation_rate_pct_per_day": 0.09,
+          "days_to_break_even": 149.7,
+          "days_since_reset": 11,
+          "last_reset_on": "2026-09-03",
+          "usable_days": 3,
+          "quality": {
+            "withheld_days_last_14": 1,
+            "note": "1 of the last 14 days withheld: output too low to be explained by soiling. Cause not determinable from this data."
+          },
+          "suggested_crew": {
+            "crew_id": "crew_14",
+            "home_base": "Townsville, QLD",
+            "crew_days": 2.1
+          },
+          "dispatched": false
+        },
+        {
+          "plant_id": "plant_1009",
+          "name": "Corvus Alpha (009)",
+          "region": "Queensland, AUS",
+          "capacity_mw": 58.8,
+          "status": "BELOW_BREAK_EVEN",
+          "soiling_loss_pct": 0.95,
+          "break_even_soiling_pct": 13.76,
+          "margin_pct": -12.81,
+          "recoverable_usd": -29559.24,
+          "cleaning_cost_usd": 31752.0,
+          "expected_energy_kwh_per_day": 387927.2,
+          "tariff_per_kwh": 0.085,
+          "days_until_next_reset": 7,
+          "accumulation_rate_pct_per_day": 0.065,
+          "days_to_break_even": 197.0,
+          "days_since_reset": 14,
+          "last_reset_on": "2026-08-31",
+          "usable_days": 3,
+          "quality": {
+            "withheld_days_last_14": 0,
+            "note": null
+          },
+          "suggested_crew": {
+            "crew_id": "crew_14",
+            "home_base": "Townsville, QLD",
+            "crew_days": 6.3
+          },
+          "dispatched": false
+        }
+      ]
+    },
+    {
+      "region": "Rajasthan, India",
+      "crews": [
+        {
+          "crew_id": "crew_11",
+          "home_base": "Jodhpur, RJ",
+          "mw_per_day": 10.2,
+          "day_rate_usd": 2578.09
+        }
+      ],
+      "capacity_mw_per_day": 10.2,
+      "recommendations": [
+        {
+          "plant_id": "plant_1006",
+          "name": "Vellore Alpha (006)",
+          "region": "Rajasthan, India",
+          "capacity_mw": 53.6,
+          "status": "ACTIONABLE",
+          "soiling_loss_pct": 5.1,
+          "break_even_soiling_pct": 4.1,
+          "margin_pct": 1.0,
+          "recoverable_usd": 3408.66,
+          "cleaning_cost_usd": 13936.0,
+          "expected_energy_kwh_per_day": 343526.7,
+          "tariff_per_kwh": 0.045,
+          "days_until_next_reset": 22,
+          "accumulation_rate_pct_per_day": 0.265,
+          "days_to_break_even": null,
+          "days_since_reset": 21,
+          "last_reset_on": "2026-08-24",
+          "usable_days": 3,
+          "quality": {
+            "withheld_days_last_14": 0,
+            "note": null
+          },
+          "suggested_crew": {
+            "crew_id": "crew_11",
+            "home_base": "Jodhpur, RJ",
+            "crew_days": 5.3
+          },
+          "dispatched": false
+        }
+      ],
+      "withheld": [
+        {
+          "plant_id": "plant_1001",
+          "name": "Highmesa Alpha (001)",
+          "region": "Rajasthan, India",
+          "capacity_mw": 47.5,
+          "status": "BELOW_BREAK_EVEN",
+          "soiling_loss_pct": 4.44,
+          "break_even_soiling_pct": 4.85,
+          "margin_pct": -0.41,
+          "recoverable_usd": -1040.6,
+          "cleaning_cost_usd": 12350.0,
+          "expected_energy_kwh_per_day": 257289.2,
+          "tariff_per_kwh": 0.045,
+          "days_until_next_reset": 22,
+          "accumulation_rate_pct_per_day": 0.38,
+          "days_to_break_even": 1.1,
+          "days_since_reset": 13,
+          "last_reset_on": "2026-09-01",
+          "usable_days": 3,
+          "quality": {
+            "withheld_days_last_14": 1,
+            "note": "1 of the last 14 days withheld: output too low to be explained by soiling. Cause not determinable from this data."
+          },
+          "suggested_crew": {
+            "crew_id": "crew_11",
+            "home_base": "Jodhpur, RJ",
+            "crew_days": 4.7
+          },
+          "dispatched": false
+        },
+        {
+          "plant_id": "plant_1011",
+          "name": "Aster Alpha (011)",
+          "region": "Rajasthan, India",
+          "capacity_mw": 5.7,
+          "status": "BELOW_BREAK_EVEN",
+          "soiling_loss_pct": 1.32,
+          "break_even_soiling_pct": 4.33,
+          "margin_pct": -3.01,
+          "recoverable_usd": -1030.5,
+          "cleaning_cost_usd": 1482.0,
+          "expected_energy_kwh_per_day": 34550.2,
+          "tariff_per_kwh": 0.045,
+          "days_until_next_reset": 22,
+          "accumulation_rate_pct_per_day": 0.29,
+          "days_to_break_even": 10.4,
+          "days_since_reset": 6,
+          "last_reset_on": "2026-09-08",
+          "usable_days": 3,
+          "quality": {
+            "withheld_days_last_14": 0,
+            "note": null
+          },
+          "suggested_crew": {
+            "crew_id": "crew_11",
+            "home_base": "Jodhpur, RJ",
+            "crew_days": 0.6
+          },
+          "dispatched": false
+        }
+      ]
+    }
+  ]
+}
