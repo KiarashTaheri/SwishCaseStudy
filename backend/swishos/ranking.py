@@ -7,8 +7,10 @@ ranking to compute — there are five independent ones. This reverses an earlier
 decision to rank the fleet globally by dollars per crew-day; that decision
 carried "crews are constrained to home regions" as its own falsifier, and the
 falsifier fired. Treating crews as one pool also understates the real constraint:
-*measured*, Rajasthan needs 10.5 crew-days from a single crew, against 6.9 if
-crew-days were fungible. See DECISIONS.md #7 and ASSUMPTIONS.md A14.
+*measured*, the fleet cannot finish before its slowest region does — Rajasthan's
+106.8 MW served by one crew at 10.2 MW/day takes 10.5 days, against the 6.9 a
+pooled model reports for the whole fleet. Pooling is 1.51x optimistic. See
+DECISIONS.md #7 and ASSUMPTIONS.md A14.
 
 Ranking inside a region is by `recoverable_usd`, descending — the plant that
 returns the most money first. That is deliberately *not* capacity-aware: it
@@ -237,7 +239,7 @@ def rank_fleet(
                 ),
                 # Not ranked by dollars: these have none. Ordered by how close
                 # they are to being worth cleaning, so the asset manager reads
-                # "next week's list" from the top. INSUFFICIENT_HISTORY has no
+                # "next week's list" from the top. NO_USABLE_READING has no
                 # margin and sorts last.
                 withheld=sorted(rest, key=_withheld_sort_key),
             )

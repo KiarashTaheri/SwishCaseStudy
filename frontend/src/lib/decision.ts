@@ -47,7 +47,7 @@ export function daysOfDustFromBreakEven(plant: PlantRow): number | null {
 }
 
 export function verdictFor(plant: PlantRow): Verdict {
-  if (plant.status === "INSUFFICIENT_HISTORY" || plant.margin_pct === null) {
+  if (plant.status === "NO_USABLE_READING" || plant.margin_pct === null) {
     return { kind: "NO_ESTIMATE", usableDays: plant.usable_days };
   }
 

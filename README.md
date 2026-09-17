@@ -68,23 +68,30 @@ four CSVs; an unpinned run a day later produces `2026-05-19 → 2026-09-15` inst
 CSV → ingest → quality gate → soiling estimate → economics → daily snapshot → API → UI
 ```
 
-**The input is the defect, not the algebra.** `soiling_loss_pct` is a total performance deficit
-against the last post-wash baseline, so everything that suppresses output lands in it. Fed to the
-brief's formula unchanged it ranks plant_1003 at **+$1,498,102** while the plant is producing 2% of
-expected — cleaning recovers nothing there. The quality gate withholds readings that cannot be
-soiling (1.6% of plant-days as availability anomalies, 15.3% withheld overall) before anything
-reaches the economics.
+**Some rows do not behave like dirt.** `soiling_loss_pct` is output lost to dirt, as the brief
+says. But soiling accumulates: it moves a median of **0.240pp/day**, never more than **1.56pp**, and
+has never exceeded **11.74%** on a credible reading. Against that, 29 transitions move more than
+20pp overnight — `plant_1000` goes 0.06% → 60.18% → 0.52% on consecutive days with no rain and no
+crew. **A loss that reverses overnight without a wash is not a loss a wash recovers.** Fed to the
+formula unchanged, the worst of these ranks plant_1003 at **+$1,498,102** while it produces 2% of
+expected. The quality gate withholds those readings before anything reaches the economics.
 
-**It never names a cause.** The data shows only that a deficit *is not soiling*. Inverter fault,
-curtailment, maintenance and metering failure are indistinguishable in `daily.csv`, and the last of
-those inverts the commercial response. Withheld days are surfaced with their evidence and no
-diagnosis — a plant producing almost nothing is more urgent than any cleaning recommendation, so it
-stays visible rather than being filtered out.
+**It never names a cause.** Inverter fault, curtailment, maintenance and metering failure are
+indistinguishable in `daily.csv`, and the last of those inverts the commercial response. Withheld
+days are surfaced with their evidence and no diagnosis — a plant producing almost nothing is more
+urgent than any cleaning recommendation, so it stays visible rather than being filtered out.
+
+**One input is improved on, and only one.** The brief's formula is used as written, with today's
+`soiling_loss_pct` — it is a *state*, and multiplying it by nothing means there is nothing to
+average. `expected_energy_kwh` is a *rate* the formula multiplies by up to 45 days, so it uses a
+14-day median instead of today's weather: measured, one day's value swings 26% on average, and
+`plant_1005`'s entire verdict turns on today being 19% dimmer than typical.
 
 **Regions are a hard partition.** Every crew's home base maps onto exactly one plant region, so a
 crew services only its own region and plants compete only against others in theirs. There is no
 fleet-wide ranking. Treating crews as one pool understates the real bottleneck — Rajasthan needs
-10.5 crew-days from a single crew, against 6.9 if crew-days were fungible.
+10.5 days from a single crew, against the 6.9 a pooled model reports for the whole fleet — 1.51x
+optimistic.
 
 **The decision is the brief's own.** Clean when `recoverable_usd = s₀·E·τ·T − C > 0`. Equivalently,
 when soiling passes the plant's break-even threshold `s* = C/(E·τ·T)`. The interface leads with the

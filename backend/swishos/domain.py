@@ -32,13 +32,14 @@ class QualityFlag(str, Enum):
 class EstimateStatus(str, Enum):
     """Whether a plant can be ranked today, and why not when it cannot.
 
-    `INSUFFICIENT_HISTORY` is a real answer, not an error: a plant cleaned two
-    days ago has too few readings since its reset to estimate from, and saying
-    so is better than ranking it on one noisy day.
+    `NO_USABLE_READING` is a real answer, not an error: today's reading was
+    either blank — no clean baseline to compare against yet — or withheld by the
+    quality gate. Saying so is better than ranking a plant on a number the gate
+    has already judged not credible as dirt.
     """
 
     ESTIMATED = "ESTIMATED"
-    INSUFFICIENT_HISTORY = "INSUFFICIENT_HISTORY"
+    NO_USABLE_READING = "NO_USABLE_READING"
 
 
 class DispatchStatus(str, Enum):
@@ -46,14 +47,14 @@ class DispatchStatus(str, Enum):
 
     Three values rather than a boolean, because "no" has two very different
     meanings to the asset manager: `BELOW_BREAK_EVEN` is a plant the system
-    understands and is telling her to wait on, while `INSUFFICIENT_HISTORY` is a
+    understands and is telling her to wait on, while `NO_USABLE_READING` is a
     plant it has no opinion about. Collapsing them would hide the second, which
     is the one she may need to act on by other means.
     """
 
     ACTIONABLE = "ACTIONABLE"
     BELOW_BREAK_EVEN = "BELOW_BREAK_EVEN"
-    INSUFFICIENT_HISTORY = "INSUFFICIENT_HISTORY"
+    NO_USABLE_READING = "NO_USABLE_READING"
 
 
 @dataclass(frozen=True)

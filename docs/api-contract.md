@@ -8,10 +8,11 @@ Base URL: `http://127.0.0.1:8000`. CORS allows `http://localhost:3000`.
 
 **Two rules that override convenience:**
 
-1. **Never name a cause for a withheld day.** The data shows only that a deficit is *not soiling*.
-   Converter fault, curtailment, maintenance and metering failure are indistinguishable in
-   `daily.csv`. API fields, UI copy and LLM output report evidence and signatures, never a
-   diagnosis. See `ASSUMPTIONS.md` A3.
+1. **Never name a cause for a withheld day.** `soiling_loss_pct` is output lost to dirt, as the
+   brief says — but some rows report a loss that behaves nothing like dirt, moving 60pp overnight
+   and back the next morning. Inverter fault, curtailment, maintenance and metering failure are
+   indistinguishable in `daily.csv`, and the last inverts the commercial response. API fields, UI
+   copy and LLM output report evidence and signatures, never a diagnosis. See `ASSUMPTIONS.md` A3.
 2. **The system runs without `ANTHROPIC_API_KEY`.** Every LLM-backed field falls back to a
    deterministic template and reports `"source": "template"`. No endpoint may fail for want of a key.
 
@@ -72,15 +73,15 @@ See `ASSUMPTIONS.md` A14.
   "region": "Arizona, USA",
   "capacity_mw": 68.9,
 
-  "status": "ACTIONABLE",           // | BELOW_BREAK_EVEN | INSUFFICIENT_HISTORY
+  "status": "ACTIONABLE",           // | BELOW_BREAK_EVEN | NO_USABLE_READING
 
-  "soiling_loss_pct": 5.23,          // s0, today's soiling. null when not estimable
+  "soiling_loss_pct": 5.23,          // s0, today's gated reading. null when withheld
   "break_even_soiling_pct": 2.94,    // s* = C*100/(E*tau*T). Always present
   "margin_pct": 2.29,                // s0 - s*. The primary column
   "recoverable_usd": 25844.0,        // s0*E*tau*T/100 - C. null when s0 is null
 
   "cleaning_cost_usd": 33072.0,
-  "expected_energy_kwh_per_day": 468693.0,   // E, 14-day median
+  "expected_energy_kwh_per_day": 451323.4,   // E, 14-day median — see below
   "tariff_per_kwh": 0.078,
   "days_until_next_reset": 32,               // T, fixed horizon, never decremented
 
@@ -88,7 +89,7 @@ See `ASSUMPTIONS.md` A14.
   "days_to_break_even": null,                // (s*-s0)/r when below. null when above or unknown
   "days_since_reset": 24,
   "last_reset_on": "2026-08-21",
-  "usable_days": 3,                          // readings behind s0
+  "usable_days": 1,                          // readings behind s0 (today's, or 0)
 
   "quality": {
     "withheld_days_last_14": 0,
@@ -99,6 +100,11 @@ See `ASSUMPTIONS.md` A14.
 }
 ```
 
+**Two inputs, treated differently.** `soiling_loss_pct` is a *state* — today's gated reading,
+used exactly as the brief supplies it. `expected_energy_kwh_per_day` is a *rate* the formula
+multiplies by `days_until_next_reset`, so it is a 14-day median rather than today's weather;
+measured, one day's value swings up to 25% and flips `plant_1005` on its own.
+
 **`margin_pct` is the headline, not `recoverable_usd`.** "2.29 points past where cleaning pays for
 itself" is checkable by a human; a dollar figure is not. Dollars are secondary.
 
@@ -108,7 +114,7 @@ itself" is checkable by a human; a dollar figure is not. Dollars are secondary.
 |---|---|---|
 | `ACTIONABLE` | `recoverable_usd > 0` | Ranked, dispatchable |
 | `BELOW_BREAK_EVEN` | Estimated, not yet worth cleaning | Listed with `days_to_break_even` |
-| `INSUFFICIENT_HISTORY` | Fewer than 3 usable days since the last reset | Listed, not dispatchable, no false precision |
+| `NO_USABLE_READING` | Today's reading is blank or withheld by the gate | Listed, not dispatchable, no false precision |
 
 Real cases in the fixture worth handling deliberately: `plant_1005` is `ACTIONABLE` at **+0.02pp /
 $224** — inside the noise, so the UI should show it as marginal rather than as a confident call.

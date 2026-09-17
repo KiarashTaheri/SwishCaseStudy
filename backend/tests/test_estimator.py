@@ -1,7 +1,10 @@
-"""Tests for the soiling estimator.
+"""Tests for the soiling reading and the accumulation rate.
 
-Pure functions, so no database. The cases that matter are the ones that cost
-money: windows crossing a reset, gated days leaking in, and lookahead.
+Pure functions, so no database. What is left to test after the estimator was
+reduced to "today's gated reading" is narrow but load-bearing: that a withheld
+day produces no estimate rather than a plausible-looking wrong one, that nothing
+peeks at tomorrow, and that the accumulation rate excludes the days a wash
+touched.
 """
 
 from __future__ import annotations
@@ -66,6 +69,56 @@ def day(offset: int) -> date:
     return START + timedelta(days=offset)
 
 
+class TestTodaysReading:
+    def test_uses_todays_value(self):
+        result = estimator.estimate_soiling(
+            plant(), readings(1.0, 2.0, 3.0), events(3), day(2)
+        )
+        assert result.status is EstimateStatus.ESTIMATED
+        assert result.soiling_loss_pct == 3.0
+
+    def test_ignores_readings_after_as_of(self):
+        """A backtest must not see tomorrow."""
+        result = estimator.estimate_soiling(
+            plant(), readings(1.0, 2.0, 99.0), events(3), day(1)
+        )
+        assert result.soiling_loss_pct == 2.0
+
+    def test_withheld_day_yields_no_estimate(self):
+        """The gate's verdict has to survive into the estimate. A plant at 96%
+        reported loss and pr 0.036 must produce no number at all — a wrong
+        number here buys a cleaning that recovers nothing."""
+        history = readings(1.0, 2.0)
+        history.append(
+            DailyReading(
+                plant_id="plant_1010",
+                reading_date=day(2),
+                energy_kwh=4_000.0,
+                expected_energy_kwh=110_000.0,
+                pr=0.036,
+                soiling_loss_pct=96.0,
+            )
+        )
+        result = estimator.estimate_soiling(plant(), history, events(3), day(2))
+        assert result.status is EstimateStatus.NO_USABLE_READING
+        assert result.soiling_loss_pct is None
+        assert result.usable_days == 0
+
+    def test_blank_baseline_yields_no_estimate(self):
+        result = estimator.estimate_soiling(
+            plant(), readings(1.0, None), events(2), day(1)
+        )
+        assert result.status is EstimateStatus.NO_USABLE_READING
+        assert result.soiling_loss_pct is None
+
+    def test_missing_day_yields_no_estimate(self):
+        """No row for today at all, rather than an unusable one."""
+        result = estimator.estimate_soiling(
+            plant(), readings(1.0, 2.0), events(5), day(4)
+        )
+        assert result.status is EstimateStatus.NO_USABLE_READING
+
+
 class TestFindLastReset:
     def test_heavy_rain_resets(self):
         assert estimator.find_last_reset(events(5, rain_on={2: 12.0}), day(4)) == day(2)
@@ -80,92 +133,17 @@ class TestFindLastReset:
         assert estimator.find_last_reset(events(5), day(4)) is None
 
     def test_ignores_resets_after_as_of(self):
-        """A backtest must not see tomorrow's rain."""
         assert estimator.find_last_reset(events(5, rain_on={4: 20.0}), day(2)) is None
 
-
-class TestWindow:
-    def test_requires_three_usable_days(self):
+    def test_days_since_reset_is_reported(self):
         result = estimator.estimate_soiling(
-            plant(), readings(1.0, 2.0), events(2), day(1)
+            plant(), readings(5.0, 0.1, 0.4, 0.7), events(4, rain_on={1: 24.4}), day(3)
         )
-        assert result.status is EstimateStatus.INSUFFICIENT_HISTORY
-        assert result.usable_days == 2
-        assert result.soiling_loss_pct is None
-
-    def test_takes_the_three_most_recent_days(self):
-        result = estimator.estimate_soiling(
-            plant(), readings(1.0, 2.0, 3.0, 4.0, 5.0), events(5), day(4)
-        )
-        assert result.status is EstimateStatus.ESTIMATED
-        assert result.soiling_loss_pct == 4.0  # median of the newest three: 5, 4, 3
-
-    def test_gated_days_are_skipped_not_counted(self):
-        history = readings(1.0, 2.0, 3.0, 4.0, 5.0)
-        history[3] = DailyReading(
-            plant_id="plant_1010",
-            reading_date=history[3].reading_date,
-            energy_kwh=4_000.0,
-            expected_energy_kwh=110_000.0,
-            pr=0.036,  # availability anomaly
-            soiling_loss_pct=96.0,
-        )
-        result = estimator.estimate_soiling(plant(), history, events(5), day(4))
-        assert result.soiling_loss_pct == 3.0  # median of 5, 3, 2 — the 96.0 never enters
-
-    def test_ignores_readings_after_as_of(self):
-        result = estimator.estimate_soiling(
-            plant(), readings(1.0, 2.0, 3.0, 4.0, 99.0), events(5), day(3)
-        )
-        assert result.soiling_loss_pct == 3.0  # median of 4, 3, 2
-
-
-class TestResetBoundary:
-    """plant_1010's real numbers: cleaned with 24.4mm of rain on 2026-09-10.
-
-    The reading stamped on the reset day still describes the dirty plant — the
-    wash only reaches the next day's generation. Including it, a naive three-day
-    median on the following day returns 6.22% against a 3.10% break-even, claims
-    +$35,238 recoverable, and dispatches a $34,992 cleaning to a plant cleaned
-    the day before.
-    """
-
-    HISTORY = (6.22, 6.28, 0.0, 0.25, 0.46, 0.63)
-    EVENTS_KWARGS = {"rain_on": {1: 24.4}, "cleaned_on": {1}}
-
-    def history(self):
-        return readings(*self.HISTORY), events(6, **self.EVENTS_KWARGS)
-
-    def test_reset_day_reading_is_excluded(self):
-        history, event_log = self.history()
-        result = estimator.estimate_soiling(plant(), history, event_log, day(3))
         assert result.last_reset_on == day(1)
-        assert result.usable_days == 2, "only the two days after the wash may count"
-        assert result.status is EstimateStatus.INSUFFICIENT_HISTORY
-
-    def test_holds_the_day_after_a_reset(self):
-        """The dangerous day: a naive window here is majority pre-reset."""
-        history, event_log = self.history()
-        result = estimator.estimate_soiling(plant(), history, event_log, day(2))
-        assert result.usable_days == 1
-        assert result.status is EstimateStatus.INSUFFICIENT_HISTORY
-        assert result.soiling_loss_pct is None
-
-    def test_estimates_once_three_clean_days_exist(self):
-        history, event_log = self.history()
-        result = estimator.estimate_soiling(plant(), history, event_log, day(4))
-        assert result.status is EstimateStatus.ESTIMATED
-        assert result.soiling_loss_pct == 0.25  # median of 0.46, 0.25, 0.0
-        assert result.days_since_reset == 3
-
-    def test_never_returns_a_pre_reset_value(self):
-        history, event_log = self.history()
-        for offset in range(2, 6):
-            result = estimator.estimate_soiling(plant(), history, event_log, day(offset))
-            if result.soiling_loss_pct is not None:
-                assert result.soiling_loss_pct < 1.0, (
-                    f"day {offset} leaked a pre-wash reading"
-                )
+        assert result.days_since_reset == 2
+        # The day after a wash is no longer a special case: the published value
+        # is already re-baselined, so today's reading is the post-wash one.
+        assert result.soiling_loss_pct == 0.7
 
 
 class TestAccumulationRate:
@@ -183,11 +161,20 @@ class TestAccumulationRate:
     def test_returns_none_without_usable_pairs(self):
         assert estimator.fit_accumulation_rate(readings(1.0), events(1)) is None
 
-    def test_is_reported_even_when_the_estimate_is_withheld(self):
+    def test_is_reported_even_when_today_is_withheld(self):
         """The rate answers 'how soon will this be worth cleaning', so it is
-        still useful on a plant too freshly reset to rank."""
-        result = estimator.estimate_soiling(
-            plant(), readings(1.0, 1.2), events(2), day(1)
+        still useful on a plant whose reading today was withheld."""
+        history = readings(1.0, 1.2, 1.4)
+        history.append(
+            DailyReading(
+                plant_id="plant_1010",
+                reading_date=day(3),
+                energy_kwh=4_000.0,
+                expected_energy_kwh=110_000.0,
+                pr=0.036,
+                soiling_loss_pct=96.0,
+            )
         )
-        assert result.status is EstimateStatus.INSUFFICIENT_HISTORY
+        result = estimator.estimate_soiling(plant(), history, events(4), day(3))
+        assert result.status is EstimateStatus.NO_USABLE_READING
         assert result.accumulation_rate_pct_per_day == pytest.approx(0.2)

@@ -145,11 +145,11 @@ class TestEvaluate:
     def test_no_estimate_yields_no_dollar_figure(self):
         result = economics.evaluate(
             plant(),
-            estimate(soiling=None, status=EstimateStatus.INSUFFICIENT_HISTORY),
+            estimate(soiling=None, status=EstimateStatus.NO_USABLE_READING),
             readings(),
             AS_OF,
         )
-        assert result.status is DispatchStatus.INSUFFICIENT_HISTORY
+        assert result.status is DispatchStatus.NO_USABLE_READING
         assert result.recoverable_usd is None
         assert result.margin_pct is None
         # The threshold depends only on the plant, so it is still knowable and

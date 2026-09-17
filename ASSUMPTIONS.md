@@ -22,7 +22,7 @@ Referenced from the decision log as `[A#]`.
 
 ---
 
-### A2 — The low-PR population is not soiling
+### A2 — The low-PR population is not recoverable by cleaning
 
 | Field | |
 |---|---|
@@ -50,7 +50,7 @@ Referenced from the decision log as `[A#]`.
 
 | Field | |
 |---|---|
-| **Assumption** | Knowing a reading is "not soiling" is sufficient; the underlying fault need not be identified. |
+| **Assumption** | Knowing a reading is not recoverable by cleaning is sufficient; the underlying fault need not be identified. |
 | **Source** | *Inferred*, scoping choice. Nothing in `daily.csv`, `events.csv` or `plants.csv` distinguishes an inverter fault from curtailment, a transformer trip, a comms dropout or planned maintenance. |
 | **Rejected** | Naming a cause in the interface. I cannot see one, and asserting an unverifiable root cause is worse than reporting an unexplained anomaly. |
 | **Cost** | If some causes *are* cleaning-recoverable, treating the whole population as uninformative discards real value. |

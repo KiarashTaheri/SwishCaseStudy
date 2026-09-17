@@ -1,47 +1,43 @@
-"""Estimate s₀ — today's soiling — for one plant.
+"""Read today's soiling for one plant, and how fast it is accumulating.
 
-What this must estimate, and what it must not
----------------------------------------------
-Cleaning does not recover the *forward mean* soiling. Both trajectories, cleaned
-and uncleaned, accumulate at the same rate `r`, so the gap between them stays
-constant at today's level:
+What this does, and why it is so small
+--------------------------------------
+`s₀` is today's gated `soiling_loss_pct`. That is the brief's own input, and
+after an earlier detour it is the one I can defend.
+
+The detour is worth recording, because it was two mistakes in a row. First I
+projected soiling forward by `r·T/2` — the forward *mean* of the uncleaned
+plant. That is wrong on paper: both trajectories, cleaned and uncleaned,
+accumulate at the same rate, so the gap between them stays at today's level and
+the rate cancels out of the difference:
 
     ∫₀ᵀ(s₀ + r·t)dt − ∫₀ᵀ(r·t)dt = s₀·T
 
-The benefit is `s₀·T`, which is exactly the brief's formula. So the job here is
-to estimate **today's soiling**, nothing more. Projecting the estimate forward by
-`r·T/2` — the forward mean of the uncleaned plant — double-counts accumulation
-that cancels out of the difference. Measured, it is 10–13× worse and dispatches
-on almost everything (341 false calls against 18). See DECISIONS.md #2.
+Measured, the projection was 10–13× worse and dispatched on almost everything.
+So I removed it and replaced it with a 3-day trailing median — smoothing rather
+than projecting. That was also wrong, in the opposite direction: a *trailing*
+median lags. Soiling climbs a median 0.240pp/day, so a 3-day median describes
+the plant as it was a day ago, reads too clean, and skips cleanings worth doing.
+Measured on plant_1000 on 2026-08-01, it read 0.65pp low, fell below break-even,
+and passed on a $6,414 gain. 24 plant-days go that way.
 
-Choosing the window
--------------------
-Scored over 1,126 plant-days against a centred median of gated values inside the
-same reset interval (a low-noise view of today, using future data as evaluation
-only). A false dispatch is charged the money it wastes, a missed clean the money
-it forgoes:
+Both detours shared a cause: I was smoothing a quantity that does not need it.
+`soiling_loss_pct` is a **state** — what the plant's deficit is today — and the
+quality gate has already removed the readings that are not credible as dirt.
+What remains moves 0.240pp on a median day and never more than 1.56pp. There is
+no noise left for a median to defend against, only lag for it to introduce.
 
-    estimator     ranked  false  missed   error cost
-    median/1        1126     25       2     $486,834
-    median/2        1028     19      14     $348,907   <- lowest
-    median/3         938     18      25     $367,390   <- shipped
-    median/5         783     17      48     $435,111
-    median/10        497     15     107     $746,138
+Contrast `expected_energy_kwh`, which the formula multiplies by `T` and which
+therefore *does* get smoothed — see `economics.py`. One is a state measured
+today; the other is a rate projected over a month. They are different
+quantities and they get different treatment. That distinction is the whole of
+this decision.
 
-Three, not two: the two are within 5% of each other and $18k over 1,126
-decisions is not resolvable at 12 plants, but a median of two values is just
-their mean and tolerates no bad day at all. Three is the shortest window where
-the median has any breakdown point. Ten is included to show that the fixed
-14-day window is materially worse — it misses 107 profitable cleanings.
-
-Median rather than mean: behind the quality gate the two are indistinguishable
-(MAE 1.832 against 1.831), because the gate has already removed the outliers a
-median would resist. It is kept as insurance against the partial-fault blind
-spot the gate cannot see (ASSUMPTIONS.md A2b), not because it measurably wins.
-
-The window never crosses a reset. A window spanning one averages a dirty plant
-with a clean one: on plant_1010 that is a $52,052 swing on a single day's
-recommendation.
+What is still computed here
+---------------------------
+`r`, the accumulation rate, and the last reset date. Neither values a cleaning —
+`r` cancels, as above. They answer the asset manager's other question, "how soon
+will this plant be worth cleaning", and they give the interface its context.
 
 Every function is pure and sees only data at or before `as_of` — no lookahead,
 no clock, no I/O (DDIA ch.17 "Determinism").
@@ -61,17 +57,13 @@ from .domain import DailyReading, EstimateStatus, Plant, PlantDayEvent
 # clean". Treated as a full reset — measured residual is 1.37% (ASSUMPTIONS.md A7).
 RESET_RAIN_MM = 8.0
 
-# Usable days since the last reset required to estimate. See the module docstring.
-WINDOW_DAYS = 3
-
 
 @dataclass(frozen=True)
 class SoilingEstimate:
-    """s₀ for one plant, plus the evidence behind it.
+    """Today's soiling for one plant, plus the evidence behind it.
 
-    `accumulation_rate_pct_per_day` is reported for planning — it answers "how
-    many days until this plant crosses break-even" — and is deliberately absent
-    from the value calculation, where it cancels.
+    `accumulation_rate_pct_per_day` is reported for planning and is deliberately
+    absent from the value calculation, where it cancels.
     """
 
     plant_id: str
@@ -94,7 +86,7 @@ def estimate_soiling(
     events: Sequence[PlantDayEvent],
     as_of: date,
 ) -> SoilingEstimate:
-    """Estimate one plant's soiling as of `as_of`.
+    """Today's soiling at `plant`, or a refusal with its reason.
 
     `readings` and `events` may cover any span; anything after `as_of` is ignored
     so a backtest cannot see the future. Both must be for a single plant.
@@ -103,25 +95,25 @@ def estimate_soiling(
     past_events = [e for e in events if e.event_date <= as_of]
     last_reset = find_last_reset(past_events, as_of)
 
-    window = _window_since_reset(history, last_reset)
-    rate = fit_accumulation_rate(history, past_events)
-    days_since_reset = (as_of - last_reset).days if last_reset else None
+    today = next((r for r in history if r.reading_date == as_of), None)
+    usable = today is not None and gates.assess_reading(today).is_usable
+    # `usable` implies a non-None soiling value — the gate rejects blanks — but
+    # the check is repeated so a future gate change cannot make this unsound
+    # silently.
+    soiling = today.soiling_loss_pct if usable and today is not None else None
 
-    status = (
-        EstimateStatus.ESTIMATED
-        if len(window) >= WINDOW_DAYS
-        else EstimateStatus.INSUFFICIENT_HISTORY
-    )
     return SoilingEstimate(
         plant_id=plant.plant_id,
         as_of=as_of,
-        status=status,
-        soiling_loss_pct=(
-            statistics.median(window) if status is EstimateStatus.ESTIMATED else None
+        status=(
+            EstimateStatus.ESTIMATED
+            if soiling is not None
+            else EstimateStatus.NO_USABLE_READING
         ),
-        accumulation_rate_pct_per_day=rate,
-        usable_days=len(window),
-        days_since_reset=days_since_reset,
+        soiling_loss_pct=soiling,
+        accumulation_rate_pct_per_day=fit_accumulation_rate(history, past_events),
+        usable_days=1 if soiling is not None else 0,
+        days_since_reset=(as_of - last_reset).days if last_reset else None,
         last_reset_on=last_reset,
     )
 
@@ -129,8 +121,12 @@ def estimate_soiling(
 def find_last_reset(events: Sequence[PlantDayEvent], as_of: date) -> date | None:
     """Most recent day on or before `as_of` when the panels were reset.
 
-    The reset day's own reading still describes the dirty plant — rain on day d
-    shows up in soiling on day d+1 — so callers must exclude it from the window.
+    Rain on day d shows up in soiling on day d+1, so the reset day's own reading
+    still describes the dirty plant. That mattered a great deal when the estimate
+    spanned several days; with a single day it does not, because the published
+    `soiling_loss_pct` is re-baselined at the reset and today's value is already
+    the post-wash one. Kept for the interface, which shows how long a plant has
+    been accumulating.
     """
     resets = [
         e.event_date
@@ -166,35 +162,13 @@ def fit_accumulation_rate(
             continue
         if today not in usable or yesterday not in usable:
             continue
-        current, previous = usable[today].soiling_loss_pct, usable[yesterday].soiling_loss_pct
+        current = usable[today].soiling_loss_pct
+        previous = usable[yesterday].soiling_loss_pct
         if current is None or previous is None:
             continue
         deltas.append(current - previous)
 
     return statistics.median(deltas) if deltas else None
-
-
-def _window_since_reset(
-    readings: Sequence[DailyReading], last_reset: date | None
-) -> list[float]:
-    """Most recent usable soiling values since the reset, newest first.
-
-    Capped at WINDOW_DAYS. Readings on or before the reset day are excluded: the
-    reset day's reading is taken before the wash takes effect, so it describes a
-    plant that no longer exists.
-    """
-    values: list[float] = []
-    for reading in sorted(readings, key=lambda r: r.reading_date, reverse=True):
-        if last_reset is not None and reading.reading_date <= last_reset:
-            break
-        if not gates.assess_reading(reading).is_usable:
-            continue
-        if reading.soiling_loss_pct is None:  # unreachable via the gate; belt and braces
-            continue
-        values.append(reading.soiling_loss_pct)
-        if len(values) == WINDOW_DAYS:
-            break
-    return values
 
 
 def estimate_fleet(

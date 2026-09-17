@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from swishos import dispatch
+from swishos import dispatch, ranking, repository
 from swishos.build import build
 from swishos.db import connect
 
@@ -111,16 +111,17 @@ class TestFleet:
                 if row["suggested_crew"]:
                     assert row["suggested_crew"]["home_base"] in bases
 
-    def test_withheld_plants_stay_visible(self, client):
-        """Hiding a plant the system cannot rank destroys the most valuable
-        signal in the data."""
+    def test_plants_not_worth_cleaning_stay_visible(self, client):
+        """Hiding a plant the system is not recommending destroys the signal
+        the asset manager most needs — including, on other dates, the plants it
+        cannot rank at all."""
         payload = client.get("/api/fleet").json()
-        statuses = {
-            row["status"]
-            for region in payload["regions"]
-            for row in region["withheld"]
-        }
-        assert "INSUFFICIENT_HISTORY" in statuses
+        withheld = [r for region in payload["regions"] for r in region["withheld"]]
+        assert len(withheld) == payload["summary"]["withheld"]
+        assert all(r["status"] != "ACTIONABLE" for r in withheld)
+        assert all(r["break_even_soiling_pct"] is not None for r in withheld), (
+            "a plant with no recommendation still owes the reader a threshold"
+        )
 
     def test_summary_totals_agree_with_the_rows(self, client):
         payload = client.get("/api/fleet").json()
@@ -163,11 +164,59 @@ class TestPlantDetail:
         assert briefing["source"] == "template"
         assert briefing["headline"] and briefing["body"]
 
-    def test_insufficient_history_has_a_threshold_but_no_dollars(self, client):
-        payload = client.get("/api/plants/plant_1007").json()
-        assert payload["status"] == "INSUFFICIENT_HISTORY"
+    def test_withheld_day_yields_a_threshold_but_no_dollars(self, database, client):
+        """plant_1003 on 2026-07-05: the reading is withheld, so there is no
+        number to rank on. The plant must still appear, with the threshold that
+        depends only on the plant, and with no dollar figure invented for it.
+
+        Ranked here for a past date on purpose — the daily build only
+        materialises the latest day, and this property has to hold on every day,
+        not only on one where it happens not to fire.
+        """
+        connection = connect(database)
+        try:
+            as_of = date(2026, 7, 5)
+            fleet = ranking.rank_fleet(
+                repository.load_plants(connection),
+                repository.load_crews(connection),
+                repository.readings_by_plant(connection),
+                repository.events_by_plant(connection),
+                as_of,
+            )
+            ranking.build_snapshot(connection, fleet)
+        finally:
+            connection.close()
+
+        payload = client.get(f"/api/plants/plant_1003?as_of={as_of}").json()
+        assert payload["status"] == "NO_USABLE_READING"
+        assert payload["soiling_loss_pct"] is None
         assert payload["recoverable_usd"] is None
+        assert payload["margin_pct"] is None
         assert payload["break_even_soiling_pct"] is not None
+        assert payload["quality"]["withheld_days_last_14"] >= 1
+
+    def test_a_withheld_plant_is_still_listed_in_its_region(self, database, client):
+        connection = connect(database)
+        try:
+            as_of = date(2026, 7, 5)
+            fleet = ranking.rank_fleet(
+                repository.load_plants(connection),
+                repository.load_crews(connection),
+                repository.readings_by_plant(connection),
+                repository.events_by_plant(connection),
+                as_of,
+            )
+            ranking.build_snapshot(connection, fleet)
+        finally:
+            connection.close()
+
+        payload = client.get(f"/api/fleet?as_of={as_of}").json()
+        rows = {
+            r["plant_id"]: r
+            for region in payload["regions"]
+            for r in region["recommendations"] + region["withheld"]
+        }
+        assert rows["plant_1003"]["status"] == "NO_USABLE_READING"
 
     def test_unknown_plant_is_404(self, client):
         assert client.get("/api/plants/plant_9999").status_code == 404

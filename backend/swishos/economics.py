@@ -34,18 +34,34 @@ was my first instinct and would have been a bug: measured per region,
 26.3). Atacama is the exception at 45 vs 80.0 on only 3 rain days in 240
 plant-days. ASSUMPTIONS.md A6.
 
-Why `E` is a 14-day median
---------------------------
-*Measured*: `expected_energy_kwh` moves a mean of 26% day over day (within-plant
-CV 20.4% across the window), so today's single value is weather, not capacity.
-That is not a rounding concern — it moves the break-even threshold by a mean of
-0.518pp and up to 1.219pp against the 14-day median, and recommendations in this
-fleet turn on margins as thin as 0.02pp.
+Which inputs get smoothed, and which do not
+-------------------------------------------
+This is the only place the brief's formula is improved on, and the improvement
+is one input, for one reason.
 
-The defensible claim is "not one day, and not the whole record", not "14 exactly":
-7, 14 and 30 days all sit within 0.23pp of each other, while 1 day is 0.518pp
-away and the full 120 days 0.440pp away in the other direction as seasonal drift
-leaks in. 14 sits in the flat middle. Reproduced by `scripts/verify.py`.
+`soiling_loss_pct` is a **state**: what the plant's deficit is today. It is used
+exactly as the brief supplies it, after the quality gate. It gets multiplied by
+nothing, so there is nothing to average over. An earlier version used a 3-day
+trailing median here; *measured*, that lagged — soiling climbs a median
+0.240pp/day, so the median described the plant as it was a day ago and skipped
+24 cleanings that were worth doing. See `estimator.py`.
+
+`expected_energy_kwh` is a **rate**, and the formula multiplies it by `T` — up
+to 45 days. So the figure it needs is a typical day's generation over that
+horizon, not today's weather. The brief's own row supplies one day.
+
+*Measured*: `expected_energy_kwh` moves a mean of 26% day over day (within-plant
+CV 20.4%). That is not a rounding concern. On 2026-09-14 it swings 25% above a
+typical day at plant_1001 and 19% below at plant_1005 — and plant_1005's entire
+verdict turns on it, going from -$4,164 on today's dim reading to +$1,692 on a
+typical day. Whether that plant is worth cleaning should not depend on whether
+today was cloudy.
+
+The window length barely matters, which is the point: 7, 14 and 30 days all sit
+within 0.23pp of each other on break-even, while 1 day is 0.518pp away and the
+full 120 days 0.440pp away in the other direction as seasonal drift leaks in. 14
+is the flat middle of that curve, not a fitted value. Reproduced by
+`scripts/verify.py`.
 
 Every function here is pure: no I/O, no clock, no database (DDIA ch.17).
 """
@@ -128,7 +144,7 @@ def evaluate(
         return PlantEconomics(
             plant_id=plant.plant_id,
             as_of=as_of,
-            status=DispatchStatus.INSUFFICIENT_HISTORY,
+            status=DispatchStatus.NO_USABLE_READING,
             soiling_loss_pct=None,
             break_even_soiling_pct=break_even,
             margin_pct=None,

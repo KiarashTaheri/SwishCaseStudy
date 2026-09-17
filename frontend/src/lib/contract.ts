@@ -13,7 +13,7 @@ export type QualityFlag =
   | "MISSING_PERFORMANCE_RATIO"
   | "NEGATIVE_SOILING";
 
-export type PlantStatus = "ACTIONABLE" | "BELOW_BREAK_EVEN" | "INSUFFICIENT_HISTORY";
+export type PlantStatus = "ACTIONABLE" | "BELOW_BREAK_EVEN" | "NO_USABLE_READING";
 
 export interface Crew {
   crew_id: string;

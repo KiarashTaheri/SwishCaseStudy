@@ -129,7 +129,7 @@ def _template_briefing(facts: dict[str, Any]) -> Briefing:
     break_even = facts.get("break_even_soiling_pct")
     soiling = facts.get("soiling_loss_pct")
 
-    if status == "INSUFFICIENT_HISTORY":
+    if status == "NO_USABLE_READING":
         usable = facts.get("usable_days", 0)
         headline = f"{name}: no estimate — {usable} usable day(s) since the last reset."
         body = (

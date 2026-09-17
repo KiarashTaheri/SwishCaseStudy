@@ -33,20 +33,23 @@ pytest suite exist; `frontend/` is scaffolded. Run the backend suite with
 
 ## The one thing to get right
 
-**`soiling_loss_pct` is not soiling.** It is total performance deficit against the last post-wash
-baseline, so everything that suppresses output lands in it. Feeding it to the economics unchanged
-dispatches trucks at plants cleaning cannot help. **Measured** (`scripts/verify.py`): 21 of 1,343
-plant-days (1.6%) are withheld as availability anomalies and 206 (15.3%) in total, including one
-plant ranked at **+$1,498,102** while producing 2% of expected for six days — plant_1003 on
-2026-07-07 at 97.99% reported loss, using that day's `expected_energy_kwh` ($1,280,573 against a
-14-day median E). An earlier draft of this file cited 7.2%; that figure does not reproduce under any
-definition tried and has been replaced with the measured rates.
+**Some rows do not behave like dirt.** `soiling_loss_pct` **is** output lost to dirt — the brief
+says so and the organisers confirmed it. Do not write that the column means something else. The
+defensible claim is narrower and fully measured: soiling *accumulates*, so a loss that reverses
+overnight without a wash is not a loss a wash recovers.
+
+**Measured** (`scripts/verify.py`): gated soiling rises a median **0.240pp/day**, never more than
+**1.56pp**, and has never exceeded **11.74%** on a credible reading across 1,138 plant-days. Against
+that, 29 transitions move >20pp in one day — `plant_1000` goes 0.06% → 60.18% → 0.52% on consecutive
+days with no rain and no crew. 21 of 1,343 plant-days (1.6%) are withheld as availability anomalies
+and 206 (15.3%) in total, including one ranked at **+$1,498,102** while producing 2% of expected for
+six days (plant_1003, 2026-07-07, using that day's `expected_energy_kwh`).
 
 Consequences that propagate through the whole system:
 
 - Rows must pass the quality gate (`QualityFlag.USABLE`) before reaching the soiling estimator.
-- **Never name a cause for a gated day.** The data shows only that a deficit *is not soiling*.
-  Converter fault, curtailment, maintenance and metering failure are indistinguishable in
+- **Never name a cause for a gated day.** The data shows only that the loss does not behave like
+  dirt. Converter fault, curtailment, maintenance and metering failure are indistinguishable in
   `daily.csv`, and the last inverts the commercial response. UI, LLM prompts and docs report
   signatures and evidence, never diagnoses. See `ASSUMPTIONS.md` A3.
 - Gated days are surfaced, not silently dropped — an unexplained deficit is information the asset
@@ -88,17 +91,22 @@ requires the system to run without one.
 
 | Symbol | Meaning | Source |
 |---|---|---|
-| `s₀` | today's soiling loss, % of expected output | gated median of the 3 most recent usable days **since the last reset** |
+| `s₀` | today's soiling loss, % of expected output | today's `soiling_loss_pct`, if it passes the gate |
 | `r` | accumulation rate, percentage points/day | estimated from dry-day rises |
-| `E` | expected generation, kWh/day | 14-day median of `expected_energy_kwh` |
+| `E` | expected generation, kWh/day | 14-day median of `expected_energy_kwh` — the one input improved on |
 | `τ` | tariff, $/kWh | `tariff_per_kwh` |
 | `T` | days until rain resets it | `days_until_next_reset` (fixed horizon, never decremented) |
 | `C` | cost to clean once, $ | `cleaning_cost_usd` (all-in; do not add crew day rate) |
 | `s*` | break-even soiling | `C/(E·τ·T)` |
 
 Soiling on day *t* is `s₀ + r·t`. The decision is `s₀ > s*`. The brief's
-`recoverable_usd = s₀·E·τ·T − C` is the same statement in dollars; its structure is sound (verified
-linear, saturation never binds) — **the inputs are the defect, not the algebra.**
+`recoverable_usd = s₀·E·τ·T − C` is the same statement in dollars, and it is used as written.
+
+**Which inputs get smoothed.** `s₀` is a *state* — today's gated reading, multiplied by nothing, so
+there is nothing to average. A 3-day trailing median was tried and removed: it lagged a rising
+quantity and skipped 24 profitable cleanings. `E` is a *rate* the formula multiplies by `T`, so it
+is a 14-day median; one day's value swings 26% on average and flips `plant_1005` unaided. That
+distinction — state versus rate — is the whole of the improvement on the brief's formula.
 
 ## Evidence discipline
 

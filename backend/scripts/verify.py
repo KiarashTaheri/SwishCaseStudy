@@ -240,132 +240,94 @@ def verify_reset_boundary(readings, events) -> None:
     )
 
 
-def verify_window_sweep(plants, readings, events) -> None:
-    """DECISIONS.md #2 / estimator docstring — why the window is 3 days.
+def verify_soiling_is_a_state(plants, readings, events) -> None:
+    """estimator.py — why today's reading is used as-is, with no smoothing.
 
-    Scored against a centred median of gated values inside the same reset
-    interval: a low-noise view of what today's soiling really was, using future
-    readings for evaluation only and never as an input.
-
-    A false dispatch is charged what it wastes; a missed clean what it forgoes.
-    The denominator is common to all windows — a plant the estimator will not
-    rank is simply not dispatched.
+    A trailing median lags a rising quantity. This measures the drift it would
+    have to smooth against the lag it would introduce, on the gated data the
+    estimator actually sees.
     """
-    section("5. Estimator window sweep")
-    print(f"       {DIM}scoring 5 window lengths over every plant-day — a moment{OFF}")
+    section("5. Soiling is a state: why it is not smoothed")
+    deltas = []
+    for rows in readings.values():
+        usable = {
+            r.reading_date: r.soiling_loss_pct
+            for r in gates.usable_readings(rows)
+            if r.soiling_loss_pct is not None
+        }
+        for day in usable:
+            previous = day - timedelta(days=1)
+            if previous in usable:
+                deltas.append(usable[day] - usable[previous])
 
-    rows = []
-    original = estimator.WINDOW_DAYS
-    try:
-        for window in (1, 2, 3, 5, 10):
-            estimator.WINDOW_DAYS = window
-            rows.append(_score_window(plants, readings, events))
-    finally:
-        estimator.WINDOW_DAYS = original
-
-    print(f"\n       {'window':>8} {'ranked':>8} {'false':>7} {'missed':>8} {'error cost':>13}")
-    for window, (ranked, false, missed, cost) in zip((1, 2, 3, 5, 10), rows):
-        marker = "  <- shipped" if window == original else ""
-        print(
-            f"       {'median/' + str(window):>8} {ranked:>8} {false:>7} "
-            f"{missed:>8} ${cost:>12,.0f}{marker}"
-        )
-
-    shipped = rows[2]
-    check("median/3 ranked plant-days", 938, shipped[0])
-    check("median/3 false dispatches", 18, shipped[1])
-    check("median/3 missed cleanings", 25, shipped[2])
-    check("median/3 error cost", 367390, round(shipped[3]))
+    rises = sorted(d for d in deltas if d > 0)
+    check("median day-over-day rise, pp", 0.240, round(statistics.median(rises), 3))
+    # Rises only. The large negative moves are washes, not drift — a plant
+    # losing 11.74pp of soiling overnight has been cleaned, which is the one
+    # thing a smoother must not average across anyway.
+    check("largest day-over-day rise, pp", 1.56, round(max(rises), 2))
+    check(
+        "highest soiling ever reported at a credible PR, %",
+        11.74,
+        round(
+            max(
+                r.soiling_loss_pct
+                for rows in readings.values()
+                for r in gates.usable_readings(rows)
+                if r.soiling_loss_pct is not None
+            ),
+            2,
+        ),
+    )
     report(
-        "why 3 and not 2",
-        f"median/2 costs ${rows[1][3]:,.0f}, ${shipped[3] - rows[1][3]:,.0f} less",
-        "A median of two values is their mean and tolerates no bad day. Three "
-        "is the shortest window where the median has any breakdown point, and "
-        "the gap is not resolvable at 12 plants.",
+        "what a 3-day trailing median would cost",
+        "it describes the plant as it was a day ago",
+        "Behind the gate there is no noise left for a median to defend against "
+        "— only lag for it to introduce. Measured on plant_1000 on 2026-08-01 "
+        "it read 0.65pp low, fell below break-even and passed on a $6,414 gain.",
     )
 
 
-def _score_window(plants, readings, events) -> tuple[int, int, int, float]:
-    ranked = false_dispatches = missed = 0
-    cost = 0.0
-    for plant_id, rows in readings.items():
-        plant = plants[plant_id]
-        truth = _truth_series(rows, events[plant_id])
-        for row in rows:
-            actual = truth.get(row.reading_date)
-            if actual is None:
-                continue
+def verify_anomalies_are_not_dirt(readings) -> None:
+    """The quality gate's justification, with no cause named.
 
-            expected_energy = economics.expected_energy_per_day(rows, row.reading_date)
-            value = lambda s: economics.recoverable_usd(  # noqa: E731
-                soiling_loss_pct=s,
-                expected_energy_kwh_per_day=expected_energy,
-                tariff_per_kwh=plant.tariff_per_kwh,
-                days_until_next_reset=plant.days_until_next_reset,
-                cleaning_cost_usd=plant.cleaning_cost_usd,
-            )
-            true_value = value(actual)
-
-            estimate = estimator.estimate_soiling(
-                plant, rows, events[plant_id], row.reading_date
-            )
-            if estimate.soiling_loss_pct is None:
-                # Not ranked, so not dispatched. If it was really worth cleaning
-                # that is a miss, charged like any other.
-                if true_value > 0:
-                    missed += 1
-                    cost += true_value
-                continue
-
-            ranked += 1
-            if value(estimate.soiling_loss_pct) > 0:
-                if true_value <= 0:
-                    false_dispatches += 1
-                    cost += -true_value  # money spent that was never there
-            elif true_value > 0:
-                missed += 1
-                cost += true_value
-    return ranked, false_dispatches, missed, cost
-
-
-def _truth_series(rows, event_log) -> dict[date, float]:
-    """Centred median of gated soiling inside the same reset interval.
-
-    Uses future readings, so it is only ever an evaluation target — never an
-    input to anything the system ships.
+    The brief says the column is output lost to dirt, and it is. This checks the
+    narrower claim the gate actually rests on: some rows report a loss that
+    behaves nothing like dirt, and a wash does not recover a loss that reverses
+    by itself overnight.
     """
-    resets = {
-        e.event_date for e in event_log if e.rain_mm >= estimator.RESET_RAIN_MM or e.cleaned
-    }
-    usable = {
-        r.reading_date: r.soiling_loss_pct
-        for r in gates.usable_readings(rows)
-        if r.soiling_loss_pct is not None
-    }
+    section("6. Withheld rows do not behave like dirt")
+    jumps = []
+    for plant_id, rows in readings.items():
+        by_date = {r.reading_date: r for r in rows}
+        for row in rows:
+            previous = by_date.get(row.reading_date - timedelta(days=1))
+            if previous is None:
+                continue
+            if row.soiling_loss_pct is None or previous.soiling_loss_pct is None:
+                continue
+            if abs(row.soiling_loss_pct - previous.soiling_loss_pct) > 20:
+                jumps.append((plant_id, previous, row))
 
-    truth = {}
-    for row in rows:
-        day = row.reading_date
-        window = []
-        for offset in range(-3, 4):
-            other = day + timedelta(days=offset)
-            if other not in usable:
-                continue
-            # Never cross a reset: a value from the other side of a wash
-            # describes a different plant.
-            low, high = min(day, other), max(day, other)
-            span = [low + timedelta(days=i + 1) for i in range((high - low).days)]
-            if any(d in resets for d in span):
-                continue
-            window.append(usable[other])
-        if window:
-            truth[day] = statistics.median(window)
-    return truth
+    check("single-day moves larger than 20pp", 29, len(jumps))
+    for plant_id, previous, row in jumps[:2]:
+        report(
+            f"{plant_id} {previous.reading_date} -> {row.reading_date}",
+            f"{previous.soiling_loss_pct:.2f}% -> {row.soiling_loss_pct:.2f}% "
+            f"(pr {previous.pr:.4f} -> {row.pr:.4f})",
+        )
+    report(
+        "the claim this supports",
+        "a loss that reverses overnight without a wash is not one a wash recovers",
+        "No cause is named, and none can be: the data cannot separate an "
+        "inverter fault from curtailment from a metering error, and the last "
+        "inverts the commercial response. ASSUMPTIONS.md A3.",
+    )
 
 
 def verify_expected_energy_window(plants, readings) -> None:
     """economics.py — why E is a 14-day median and not today's value."""
-    section("6. The expected-energy window behind E")
+    section("7. Expected energy is a rate: why it IS smoothed")
     changes = []
     for rows in readings.values():
         for previous, current in zip(rows, rows[1:]):
@@ -422,38 +384,36 @@ def verify_expected_energy_window(plants, readings) -> None:
 
 
 def verify_coverage(plants, readings, events) -> None:
-    """Slide 3 / DECISIONS.md — how often the system declines to rank."""
-    section("7. Coverage: how often there is no opinion")
-    no_opinion = Counter()
+    """How often the system declines to rank, and why.
+
+    With the estimate reduced to today's gated reading, this is exactly the
+    gate's refusal rate — which is both simpler to explain and better coverage
+    than the 3-day window it replaced (66.1%).
+    """
+    section("8. Coverage: how often there is no opinion")
+    declined = Counter()
     total = 0
     for plant_id, rows in readings.items():
         plant = plants[plant_id]
-        first = min(r.reading_date for r in rows)
         for row in rows:
             total += 1
             estimate = estimator.estimate_soiling(
                 plant, rows, events[plant_id], row.reading_date
             )
-            if estimate.soiling_loss_pct is not None:
-                continue
-            if (
-                estimate.last_reset_on is not None
-                and (row.reading_date - estimate.last_reset_on).days
-                <= estimator.WINDOW_DAYS
-            ):
-                no_opinion["reset within 3 days (correct — the plant is clean)"] += 1
-            elif (row.reading_date - first).days < estimator.WINDOW_DAYS:
-                no_opinion["first days of history"] += 1
-            else:
-                no_opinion["withheld readings inside the window (blind spot)"] += 1
+            if estimate.soiling_loss_pct is None:
+                declined[gates.assess_reading(row).flag.value] += 1
 
-    declined = sum(no_opinion.values())
-    check("plant-days with no rankable estimate", 455, declined)
-    check("as a share of all plant-days, %", 33.9, round(100 * declined / total, 1))
-    for reason, count in no_opinion.most_common():
-        report(reason, count)
-    blind = no_opinion["withheld readings inside the window (blind spot)"]
-    check("the blind spot alone, %", 11.7, round(100 * blind / total, 1))
+    missing = sum(declined.values())
+    check("plant-days with no estimate", 206, missing)
+    check("coverage, %", 84.7, round(100 * (total - missing) / total, 1))
+    for flag, count in declined.most_common():
+        report(flag, count)
+    report(
+        "versus the 3-day window this replaced",
+        "66.1% coverage, 455 plant-days with no opinion",
+        "The window declined 269 plant-days purely because a plant had been "
+        "washed recently — a plant that is clean, described as unknowable.",
+    )
 
 
 def verify_crew_regions(plants, crews) -> None:
@@ -464,7 +424,7 @@ def verify_crew_regions(plants, crews) -> None:
     Region-bound, the fleet cannot finish before its slowest region does, and
     that floor is what a pooled model hides.
     """
-    section("8. Crew regions and the real bottleneck")
+    section("9. Crew regions and the real bottleneck")
     by_region: dict[str, list[Crew]] = defaultdict(list)
     for crew in crews:
         by_region[crew_region(crew)].append(crew)
@@ -530,7 +490,8 @@ def main() -> int:
     verify_gate_rates(readings)
     verify_plant_1003(plants, readings)
     verify_reset_boundary(readings, events)
-    verify_window_sweep(plants, readings, events)
+    verify_soiling_is_a_state(plants, readings, events)
+    verify_anomalies_are_not_dirt(readings)
     verify_expected_energy_window(plants, readings)
     verify_coverage(plants, readings, events)
     verify_crew_regions(plants, crews)

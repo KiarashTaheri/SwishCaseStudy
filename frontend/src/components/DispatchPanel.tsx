@@ -58,7 +58,7 @@ export function DispatchPanel({ plant, asOf, source, onDispatched }: DispatchPan
   if (plant.status !== "ACTIONABLE") {
     return (
       <Notice title="Not dispatchable today">
-        {plant.status === "INSUFFICIENT_HISTORY"
+        {plant.status === "NO_USABLE_READING"
           ? "There is no soiling estimate to spend against yet."
           : "Soiling has not reached the point where a wash repays itself before the next rain."}
       </Notice>

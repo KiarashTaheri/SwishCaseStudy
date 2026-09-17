@@ -28,7 +28,7 @@ the system, framework choice) — those are mine to decide and defend.
 it. About 2% of plant-days sit at 60% or 98% loss, reverse the next day with no rain and no crew, and
 in one case persist through 19.7 mm of rainfall.
 
-**Assuming** — Those are not soiling. I exclude them from the cleaning economics and flag them.
+**Assuming** — Those losses are not recovered by cleaning. I exclude them from the economics and flag them.
 
 ### 2. Am I reading `days_until_next_reset` as a fixed expected horizon, correctly?
 

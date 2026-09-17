@@ -8,54 +8,77 @@ Numbers cited here are reproducible from `data/` — see `verify.py`.
 
 ---
 
-## 1. Estimate today's soiling from the current interval only, not a fixed window
+## 1. Use the brief's formula, and improve exactly one of its two inputs
 
-**Decision.** `s₀` is the median of the **3 most recent gated readings since the last reset**
-(`rain_mm ≥ 8` or `cleaned = 1`), not a fixed trailing 14 days. The window never crosses a reset, and
-excludes the reset day's own reading — rain on day *d* only reaches generation on *d+1*, so that
-reading still describes the dirty plant (measured: higher than the next day in **93 of 96** reset
-events, mean 3.69pp). This is the segmentation step NREL's RdTools SRR method performs before any
-soiling fit.
+**Decision.** `recoverable_usd = s₀·E·τ·T − C`, as the brief wrote it. Presented as a break-even
+soiling threshold `s* = C/(E·τ·T)` and the margin over it, which is the same statement in a form a
+human can check. One input is changed:
 
-**Why three.** Scored over 1,126 plant-days by the dollar cost of decision errors — a false dispatch
-charged what it wastes, a missed clean what it forgoes: median/1 $486,834 · **median/2 $348,907** ·
-median/3 $367,390 · median/5 $435,111 · median/10 $746,138. Two is lowest, but $18k over 1,126
-decisions is not resolvable at 12 plants, and a median of two values is just their mean and tolerates
-no bad day. Three is the shortest window where the median has any breakdown point. The boundary rule
-is the structural defence; the median is the backstop for what the gate cannot see.
+| Input | Treatment | Why |
+|---|---|---|
+| `s₀` — `soiling_loss_pct` | **today's gated reading, as supplied** | a *state*. The formula multiplies it by nothing, so there is nothing to average over. |
+| `E` — `expected_energy_kwh` | **14-day median** | a *rate*. The formula multiplies it by `T` (up to 45 days), so it needs a typical day, not today's weather. |
 
-**Rejected.** *Latest row* — one bad day dispatches a truck. *Fixed 14-day median* — averages across
-cleaning events. plant_1011 was cleaned on 2026-09-08 and is at 1.46%; a fixed median reports 5.88%,
-above its 4.33% break-even, and recommends re-cleaning a plant cleaned six days ago. plant_1010 fails
-the same way. That is 2 of 12 plants, both toward wasted dispatches.
+That distinction is the whole improvement, and it is the only place the brief's arithmetic is
+touched. *Measured*: `expected_energy_kwh` moves a mean of **26% day over day**; on 2026-09-14 it
+runs 25% above typical at plant_1001 and 19% below at plant_1005 — and plant_1005's verdict turns on
+that alone, −$4,164 on today's dim reading against +$1,692 on a typical day. Whether a plant is
+worth cleaning should not depend on whether today was cloudy. The window length barely matters,
+which is the point: 7, 14 and 30 days sit within 0.23pp of each other on break-even, while 1 day is
+0.518pp away and the full record 0.440pp away as seasonal drift leaks in.
 
-**Cost.** Straight after a reset the interval is 1–2 days long, so the estimate is noisy exactly when
-the plant is cleanest. Mitigated because a just-reset plant is far from break-even anyway.
+**Rejected.** *Smoothing `s₀` as well.* I shipped a 3-day trailing median of gated readings before
+measuring it properly — see #2. *Rewriting the integral.* Under linear accumulation the gain is
+∫₀ᵀ(s₀+rt)dt − ∫₀ᵀ(rt)dt = s₀·T, exactly what the brief wrote. Linearity holds: six plants keep a
+constant rate across both halves of their longest dry run, and nothing exceeds 12% loss, so
+saturation never binds. *Adding a `days_until_next_reset` countdown* — see A6; four of five regions
+confirm the column is an expected wait, not a countdown.
 
-**Falsifier.** If resets were rare relative to the window, the fixed median would be equivalent and
-simpler. It isn't: median interval length across the fleet is 3–13 days.
+**Cost.** `s₀` now rests on a single reading, so one bad day that passes the gate goes straight into
+the economics with nothing behind it. The gate is the only defence, which is why A2b's monitoring
+exists. Inherits the formula's assumptions: instant full recovery, fixed horizon, no discounting.
 
-## 2. Keep the brief's formula; fix what feeds it
+**Falsifier.** A partial fault — a plant at PR 0.6, below any plausible soiling but above the gate's
+floor — would pass into `s₀` unchallenged and buy a cleaning that recovers nothing. A single month
+of real PR with maintenance tickets attached would show whether that band is populated. Separately,
+if `expected_energy_kwh` were already a rolling figure rather than a daily one, the 14-day median
+would be redundant.
 
-**Decision.** Use `recoverable_usd = s₀·E·τ·T − C` as given. Present it as break-even days
-(`C ÷ daily_recovery`) and as a break-even soiling threshold (`s* = C/(E·τ·T)`) — the same statement,
-legible to a crew lead.
+## 2. Two estimators built, measured, and deleted
 
-**Rejected.** Rewriting the integral. Under linear accumulation the gain is ∫₀ᵀ(s₀+rt)dt − ∫₀ᵀ(rt)dt
-= s₀·T, which is what the brief wrote. Linearity holds — six plants keep a constant rate across both
-halves of their longest dry run, and nothing exceeds 12% loss, so saturation never binds. The
-structure was never the problem.
+**Decision.** Both attempts to improve `s₀` were removed after measurement. Recording them because
+they were the two most expensive hours of the build and the reasoning is the deliverable.
 
-**Confirmed the hard way.** I built a forward projection — `s₀ + r·T/2`, the forward *mean* soiling
-of the uncleaned plant — and tuned the estimator to match it. That is the wrong target: cleaning
-recovers the constant *gap*, not the forward mean. Scored against a centred median of gated values
-inside the same reset interval, the projection measured **10–13× worse** (341 false dispatches
-against 18) and was removed. The algebra and the measurement agree; my intermediate step did not.
+**Attempt one — forward projection.** I computed `s₀ + r·T/2`, the forward *mean* soiling of the
+uncleaned plant, and tuned the estimator against it. Wrong target: cleaning recovers the constant
+*gap* between the cleaned and uncleaned trajectories, not the forward mean, and both accumulate at
+the same rate so `r` cancels. Scored against a centred median of gated values inside the same reset
+interval, the projection measured **10–13× worse** — 341 false dispatches against 18.
 
-**Cost.** Inherits the formula's assumptions: instant full recovery, constant horizon, no discounting.
+**Attempt two — a 3-day trailing median.** Having removed the projection I replaced it with
+smoothing, which fails in the opposite direction. A trailing median *lags* a rising quantity. Gated
+soiling climbs a median **0.240pp/day**, so a 3-day median describes the plant as it was a day ago
+and reads too clean. *Measured*: plant_1000 on 2026-08-01 read 0.65pp low, fell below break-even,
+and passed on a **$6,414** gain. **24 plant-days** go that way. It also cost coverage — the window
+needed three usable days since the last reset, so it declined to rank **455 of 1,343** plant-days
+(66.1% coverage) against 206 (84.7%) now, and **269 of those refusals were plants that had simply
+been washed recently**: clean plants, described as unknowable.
 
-**Falsifier.** A plant sustaining a loss high enough to saturate, where the linear model would
-overstate the gain.
+**What both had in common.** I was smoothing a quantity that does not need it. Behind the quality
+gate there is no noise left for a median to defend against — gated soiling never moves more than
+1.56pp in a day — only lag for it to introduce.
+
+**Rejected.** *Keeping the 3-day median and justifying it as robustness.* A median of three tolerates
+one bad value, which is real insurance; but the gate already removes the values it would be
+insuring against, so it is paying twice for one defence and taking a measurable loss to do it.
+
+**Cost.** Two parameters and a reset-boundary rule were deleted along with the estimator, and with
+them a genuine protection: the 3-day median would have absorbed a single bad reading that slipped
+past the gate. That protection is now entirely the gate's job.
+
+**Falsifier.** A bad reading passing the gate and reaching a dispatch. If that happens, the answer is
+a better gate — a per-plant detector calibrated against that plant's own post-wash baseline — not a
+median reinstated on top of a gate that let it through.
 
 ## 3. Precompute the fleet ranking once daily
 
@@ -180,11 +203,21 @@ of the 13 unexplained day-over-day soiling improvements above 1pp — improvemen
 cleaning can account for — every one has a prior-day PR between 0.0198 and 0.3853, already below the
 floor. The other 63 are all ≤ 0.240pp, which is noise.
 
-**What the measurement does *not* show.** It establishes two populations, not which one is soiling.
-That attribution rests on the brief's own statement that soiling only resets on rain or cleaning
-(`ASSUMPTIONS.md` A1–A2), and the code says so rather than asserting it as fact. The gate also never
-names a cause: inverter fault, curtailment, maintenance and metering failure are indistinguishable
-here, and the last inverts the commercial response (A3).
+**Why withholding them is right, without disputing what the column means.** `soiling_loss_pct` is
+output lost to dirt — the brief says so, and the organisers confirmed it when asked. The gate does
+not need that claim overturned. It rests on something narrower and fully measured: **soiling
+accumulates.** Gated soiling rises a median 0.240pp/day, never more than 1.56pp in a day, and has
+never exceeded 11.74% on a credible reading across 1,138 plant-days. Against that, 29 transitions
+move more than 20pp overnight — plant_1000 goes 0.06% → 60.18% → 0.52% on consecutive days with no
+rain and no crew.
+
+**A loss that reverses overnight without a wash is not a loss a wash recovers.** That is the whole
+argument, it needs no claim about what caused anything, and it survives the organisers' answer. An
+earlier draft of this log argued instead that the column "is not soiling"; that was a stronger claim
+than the evidence supports and than the brief allows, and it has been withdrawn.
+
+The gate still never names a cause: inverter fault, curtailment, maintenance and metering failure
+are indistinguishable here, and the last inverts the commercial response (A3).
 
 **Rejected.** *Trusting `soiling_loss_pct`* — it ranks plant_1003 at **+$1,498,102** while the plant
 produces 2% of expected. *Statistical outlier detection* (z-score, IQR, rolling MAD) — needs tuning,
@@ -193,7 +226,8 @@ faults. *A day-over-day jump rule* — fires only after the anomaly ends. *Silen
 producing almost nothing is more urgent than any cleaning recommendation.
 
 **Cost.** Blind to *partial* availability loss: a plant at 70% availability presents identically to
-one at 30% soiling and passes the gate. A genuine soiling event below PR 0.5 would be withheld,
+one at 30% soiling and passes the gate. That cost rose when the 3-day median was removed (#2) — the
+gate is now the only thing standing between a bad reading and a dispatch. A genuine soiling event below PR 0.5 would be withheld,
 which I accept — at observed accumulation rates that state is months away and would be a maintenance
 incident long before a cleaning decision.
 
@@ -201,6 +235,7 @@ incident long before a cleaning decision.
 empty band is measured on 12 plants × 120 days only; if the populations merge, the threshold stops
 being free and starts discarding real soiling. Rather than assume, `gates.verify_empty_band()`
 re-measures the gap on every build and warns when it closes (`ASSUMPTIONS.md` A2b).
+
 ## 10. `days_until_next_reset` used as a fixed horizon
 
 **Decision.** Use the column as a constant per-plant expected horizon. Never decremented by days since
