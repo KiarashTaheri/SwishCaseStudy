@@ -10,9 +10,19 @@ Numbers cited here are reproducible from `data/` — see `verify.py`.
 
 ## 1. Estimate today's soiling from the current interval only, not a fixed window
 
-**Decision.** `s₀` is the median of `soiling_loss_pct` over days since the last reset (`rain_mm ≥ 8`
-or `cleaned = 1`), not over a fixed trailing 14 days. This is the segmentation step NREL's RdTools
-SRR method performs before any soiling fit.
+**Decision.** `s₀` is the median of the **3 most recent gated readings since the last reset**
+(`rain_mm ≥ 8` or `cleaned = 1`), not a fixed trailing 14 days. The window never crosses a reset, and
+excludes the reset day's own reading — rain on day *d* only reaches generation on *d+1*, so that
+reading still describes the dirty plant (measured: higher than the next day in **93 of 96** reset
+events, mean 3.69pp). This is the segmentation step NREL's RdTools SRR method performs before any
+soiling fit.
+
+**Why three.** Scored over 1,126 plant-days by the dollar cost of decision errors — a false dispatch
+charged what it wastes, a missed clean what it forgoes: median/1 $486,834 · **median/2 $348,907** ·
+median/3 $367,390 · median/5 $435,111 · median/10 $746,138. Two is lowest, but $18k over 1,126
+decisions is not resolvable at 12 plants, and a median of two values is just their mean and tolerates
+no bad day. Three is the shortest window where the median has any breakdown point. The boundary rule
+is the structural defence; the median is the backstop for what the gate cannot see.
 
 **Rejected.** *Latest row* — one bad day dispatches a truck. *Fixed 14-day median* — averages across
 cleaning events. plant_1011 was cleaned on 2026-09-08 and is at 1.46%; a fixed median reports 5.88%,
@@ -35,6 +45,12 @@ legible to a crew lead.
 = s₀·T, which is what the brief wrote. Linearity holds — six plants keep a constant rate across both
 halves of their longest dry run, and nothing exceeds 12% loss, so saturation never binds. The
 structure was never the problem.
+
+**Confirmed the hard way.** I built a forward projection — `s₀ + r·T/2`, the forward *mean* soiling
+of the uncleaned plant — and tuned the estimator to match it. That is the wrong target: cleaning
+recovers the constant *gap*, not the forward mean. Scored against a centred median of gated values
+inside the same reset interval, the projection measured **10–13× worse** (341 false dispatches
+against 18) and was removed. The algebra and the measurement agree; my intermediate step did not.
 
 **Cost.** Inherits the formula's assumptions: instant full recovery, constant horizon, no discounting.
 
@@ -99,20 +115,36 @@ called decorative.
 **Falsifier.** A task where the reasoning genuinely isn't expressible as arithmetic — free-text
 constraints from the crew lead, say — would justify moving it into the loop.
 
-## 7. Rank by dollars per crew-day
+## 7. Rank within region; there is no fleet-wide ranking
 
-**Decision.** Order by `net ÷ (capacity_mw ÷ mw_per_day)`, not by raw net dollars. Crews are the
-scarce resource; a 72 MW plant is 4–6 crew-days.
+**Decision.** Region is a hard partition on the dispatch problem, not an attribute of it. Each crew
+services only its home region, so plants compete solely against others in the same region and the
+fleet view is grouped, never globally ordered. Within a region, order by `recoverable_usd`.
 
-**Rejected.** Ranking by net dollars — it reorders the list wrongly (plant_1008 and plant_1006 swap).
-A full scheduling optimiser (knapsack/VRP) captures little more for far more code, and the brief
-warns that anything extra is extra to explain.
+**This reverses the earlier decision in this slot**, which ranked fleet-wide by dollars per crew-day.
+That decision's own falsifier — "crews constrained to home regions (question #6, unanswered)" — has
+now fired. Every `home_base` suffix maps onto exactly one plant region: Antofagasta/CL is the Atacama
+port city, Jodhpur/RJ is in Rajasthan, Seville/ES in Andalusia, Townsville/QLD in Queensland, Phoenix
+and Tucson/AZ in Arizona. Five regions, six crews, Arizona holding two. Flying the Jodhpur crew to
+Arizona is not a scheduling option.
 
-**Cost.** Ignores travel between regions and crew availability windows. Greedy, so not provably optimal.
+**Rejected.** *A single fleet-wide crew pool.* It is not merely presentational: it reports 6.9
+crew-days to clean the fleet against a true per-region bottleneck of **10.5 crew-days in Rajasthan**
+— one crew, the slowest (10.2 MW/day) and dearest ($2,578/day) in the fleet, against 106.8 MW of
+plant. It would also rank a Chilean plant above a Rajasthan one and then offer a crew that cannot
+reach it. *Dollars per crew-day* remains the right secondary ordering under scarcity, but it is only
+meaningful within a region, because crew-days are not fungible across continents. *A scheduling
+optimiser* captures little more for far more code.
 
-**Falsifier.** Crews constrained to home regions (question #6, unanswered), or travel time large
-enough to dominate cleaning time.
+**Cost.** No cross-region comparison, so the interface cannot answer "where is the fleet's best
+dollar" — only "where is this region's". A region whose crew is saturated is starved with no
+mechanism to borrow. Travel time and availability windows within a region are still unmodelled, and
+crew choice within Arizona is not arbitrary either: crew_15 dominates crew_10 outright ($69/MW
+against $122/MW).
 
+**Falsifier.** A documented multi-region remit for any crew, or mobilisation cost data showing
+cross-region dispatch is actually viable. Either collapses the partition and restores a global
+ranking.
 ## 8. Partial washes: measured, not built
 
 **Decision.** Ignore sub-8mm rainfall in the economics.
@@ -126,32 +158,49 @@ windows are shortest.
 
 **Falsifier.** Any plant sitting within ~13% of break-even. Then the correction decides it.
 
-## 9. Anomaly flagging: deferred, not built — open for revisit
+## 9. Physical-plausibility gate on every reading — reversed from "deferred"
 
-**Decision.** No data-quality gate. Decision 1's interval median already absorbs isolated bad rows.
+**Decision.** Withhold any plant-day with `pr < 0.5` before it reaches the estimator, label it
+`AVAILABILITY_ANOMALY`, and surface it rather than drop it. Measured on the pinned dataset: 21 of
+1,343 plant-days (1.6%) withheld as anomalies, 206 (15.3%) withheld in total once missing baselines
+are counted.
 
-**Rejected.** A three-rule physical-plausibility gate. Tested directly: it changes `s₀` on 1 of 12
-plants, by 0.42 points, on a plant nowhere near break-even. **Zero decisions change**, so it fails the
-same test I applied in #8.
+**This reverses the earlier decision in this slot**, which deferred the gate because it moved `s₀` on
+1 of 12 plants by 0.42 points and changed zero decisions. Two things overturned it. First, that
+decision's own falsifier fired: it required "an anomaly lasting longer than half the current
+interval", and plant_1003's ran six days — long enough to defeat the interval median outright. Second,
+the earlier note predicted the fix exactly — *"the flag should key on PR level, not on the
+day-over-day jump; the level fires on day one, the jump only after it has ended, six days too late."*
+That is precisely what shipped.
 
-**What was found, for the record.** 14 plant-days contradict `soiling_loss_pct`'s stated meaning —
-soiling falling 93–100% overnight with `rain_mm = 0.0` and `cleaned = 0`, one case surviving 19.7 mm
-unchanged. On all 13 large drops, PR sits at 0.020–0.390 against a normal 0.92–0.98. No amount of
-dust blocks 98% of sunlight. Wind removal was considered and is not present: drops are either >50
-points (13 events) or <1 point (86 events, PR unchanged to three decimals) with **nothing between**.
+**Why the threshold is not tuned.** The PR distribution is bimodal with an empty band: 21 readings at
+or below **0.3899**, 1,322 at or above **0.8664**, and nothing between. Every cut inside that band
+produces an identical partition, so the result does not depend on where it is placed. Corroboration:
+of the 13 unexplained day-over-day soiling improvements above 1pp — improvements no rain and no
+cleaning can account for — every one has a prior-day PR between 0.0198 and 0.3853, already below the
+floor. The other 63 are all ≤ 0.240pp, which is noise.
 
-**If revisited**, the flag should key on PR *level*, not on the day-over-day jump — the level fires on
-day one of a problem, the jump only after it has ended, six days too late for plant_1003. It would be
-a maintenance signal, not a cleaning one, and the value is that the fleet view doesn't go silent on a
-plant losing far more than dirt ever could.
+**What the measurement does *not* show.** It establishes two populations, not which one is soiling.
+That attribution rests on the brief's own statement that soiling only resets on rain or cleaning
+(`ASSUMPTIONS.md` A1–A2), and the code says so rather than asserting it as fact. The gate also never
+names a cause: inverter fault, curtailment, maintenance and metering failure are indistinguishable
+here, and the last inverts the commercial response (A3).
 
-**Cost of deferring.** A plant at 2% output is silently absent from recommendations with no
-explanation. `QualityFlag.AVAILABILITY_ANOMALY` in `backend/swishos/domain.py` is currently unused.
+**Rejected.** *Trusting `soiling_loss_pct`* — it ranks plant_1003 at **+$1,498,102** while the plant
+produces 2% of expected. *Statistical outlier detection* (z-score, IQR, rolling MAD) — needs tuning,
+carries no physical meaning, and would flag genuinely fast-soiling Rajasthan plants alongside real
+faults. *A day-over-day jump rule* — fires only after the anomaly ends. *Silent dropping* — a plant
+producing almost nothing is more urgent than any cleaning recommendation.
 
-**Falsifier.** An anomaly lasting longer than half the current interval would defeat the median and
-make the gate load-bearing rather than cosmetic. plant_1003's ran six days; the margin is thinner than
-it looks.
+**Cost.** Blind to *partial* availability loss: a plant at 70% availability presents identically to
+one at 30% soiling and passes the gate. A genuine soiling event below PR 0.5 would be withheld,
+which I accept — at observed accumulation rates that state is months away and would be a maintenance
+incident long before a cleaning decision.
 
+**Falsifier.** A confirmed soiling event below PR 0.5 with no availability fault. Separately, the
+empty band is measured on 12 plants × 120 days only; if the populations merge, the threshold stops
+being free and starts discarding real soiling. Rather than assume, `gates.verify_empty_band()`
+re-measures the gap on every build and warns when it closes (`ASSUMPTIONS.md` A2b).
 ## 10. `days_until_next_reset` used as a fixed horizon
 
 **Decision.** Use the column as a constant per-plant expected horizon. Never decremented by days since
@@ -170,13 +219,27 @@ soiling is fastest.
 ## 11. Stack
 
 **Decision.** Python/FastAPI backend, Next.js/TypeScript frontend — the stack named in the brief.
+Taken as the default rather than argued on technical merit: the live session is reviewers opening
+files and asking why, and a familiar idiom spends none of that conversation on framework choice.
 
-**Rejected.** Anything faster to write. "I used yours" costs nothing to defend and the brief says it
-cares that it runs, not which framework.
+**Rejected.** *Vite + React* — fewer moving parts, no SSR machinery for one screen. Saves perhaps ten
+minutes and costs a README paragraph justifying the deviation, plus a port if this ever lands in the
+real SwishOS. *A single FastAPI process serving server-rendered HTML* — genuinely the smallest thing
+that works, one runtime, no CORS, no contract to keep in sync; it directly eliminates the cost below.
+It loses because it forfeits the typed contract between the ranking payload and the interface, and
+dispatch correctness lives in that contract. *Next.js full-stack, no Python* — one runtime, and the
+honest answer to the cost below; it loses because the domain logic is statistical (gating, medians
+over reset-bounded windows, economics) and Python is where that is natural to write and test.
 
-**Cost.** Two runtimes and two dependency trees for a system one could serve from a single process.
+**Cost.** Two runtimes, two dependency trees, two dev servers, a CORS boundary, and an API contract
+to keep in sync, for a system one process could serve. The real cost is setup surface: every extra
+step is a way the clean clone fails on the reviewer's machine, and a system that does not boot scores
+nothing regardless of what is inside it.
 
-**Falsifier.** None within the time budget.
+**Falsifier.** If a clean clone cannot run with roughly `pip install -r requirements.txt`,
+`npm install` and two start commands, the two-runtime cost has outgrown the familiarity benefit and I
+collapse to a single FastAPI process serving a prebuilt static bundle. Conversely, auth or a second
+screen would make Next.js earn its place rather than being overhead.
 
 ---
 
