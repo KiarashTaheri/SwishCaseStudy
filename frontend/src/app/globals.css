@@ -1,25 +1,43 @@
 @import "tailwindcss";
 
-/* One fixed light theme. A dashboard read at 8am in an office needs the signal
-   colour to mean the same thing on every screen; a second palette doubles the
-   contrast surface to verify for no decision-making benefit. */
+/*
+ * Palette sampled from swishsolar.com's own product UI, so this reads as the
+ * same system rather than as a separate tool: navy sidebar, near-white content,
+ * one orange that means "act on this".
+ *
+ * One fixed light theme. A dashboard read at 8am in an office needs the signal
+ * colour to mean the same thing on every screen, and a second palette doubles
+ * the contrast surface to verify for no decision-making benefit.
+ */
 @theme {
-  --color-paper: #eef1f2;
-  --color-surface: #ffffff;
-  --color-rule: #d2dade;
-  --color-rule-strong: #9fb0b7;
+  /* Surfaces */
+  --color-shell: #161c2c; /* sidebar */
+  --color-shell-hover: #1e2637;
+  --color-shell-active: #262f42;
+  --color-canvas: #fafafa; /* page behind the cards */
+  --color-surface: #ffffff; /* cards and tables */
+  --color-subtle: #f9fbfd; /* table headers, inset rows */
+  --color-rule: #e5e5e5;
+  --color-rule-strong: #d3d6dc;
 
-  --color-ink: #10222b;
-  --color-ink-soft: #445d68;
-  --color-ink-faint: #748c96;
+  /* Text */
+  --color-ink: #33394a;
+  --color-ink-strong: #1d2230;
+  --color-ink-soft: #737373;
+  --color-ink-faint: #9aa0aa;
+  --color-on-shell: #e8eaee;
+  --color-on-shell-soft: #8b93a3;
 
-  /* Reserved for "past break-even". Used nowhere else, so its presence on the
-     page is itself the recommendation. */
-  --color-signal: #b66a09;
-  --color-signal-wash: #f6e8d2;
+  /* The brand orange. Reserved for "past break-even" and for the primary
+     action — used nowhere decorative, so its presence on a row IS the
+     recommendation. */
+  --color-signal: #df5b12;
+  --color-signal-strong: #c04d0c;
+  --color-signal-wash: #fdf0e8;
 
+  --color-positive: #15803d;
   --color-alert: #9c2f26;
-  --color-alert-wash: #f6e4e2;
+  --color-alert-wash: #fbeceb;
 
   --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
   --font-doc: var(--font-plex-serif), ui-serif, Georgia, serif;
@@ -30,18 +48,17 @@
 }
 
 body {
-  background-color: var(--color-paper);
+  background-color: var(--color-canvas);
   color: var(--color-ink);
 }
 
-/* Figures are compared down a column within a region band; proportional digits
-   break that alignment. */
+/* Figures are compared down a column; proportional digits break that alignment. */
 .tabular {
   font-variant-numeric: tabular-nums;
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-ink);
+  outline: 2px solid var(--color-signal);
   outline-offset: 2px;
 }
 

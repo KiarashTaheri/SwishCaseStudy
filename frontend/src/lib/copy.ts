@@ -43,11 +43,11 @@ export function verdictDetail(verdict: Verdict, plant: PlantRow): string {
       return `Under a day of dust separates this from break-even, which is inside the noise on the estimate.${dollars}`;
     }
     case "APPROACHING":
-      return `Crosses break-even in ${formatDays(verdict.daysToBreakEven)} at the current accumulation rate.`;
+      return `Worth cleaning in ${formatDays(verdict.daysToBreakEven)} if it keeps getting dirtier at this rate.`;
     case "BELOW":
       return verdict.daysToBreakEven === null
         ? "Not worth cleaning before the next rain."
-        : `Break-even in ${formatDays(verdict.daysToBreakEven)} at the current accumulation rate.`;
+        : `Worth cleaning in ${formatDays(verdict.daysToBreakEven)} if it keeps getting dirtier at this rate.`;
     case "NO_ESTIMATE":
       return insufficientHistoryReason(plant, verdict.usableDays);
   }

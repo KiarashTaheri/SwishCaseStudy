@@ -7,9 +7,15 @@ import { formatDateShort, formatPct } from "@/lib/format";
 /** Rain at or above this washes panels, per the brief's data dictionary. */
 const WASHING_RAIN_MM = 8;
 
-const VIEW_WIDTH = 640;
-const VIEW_HEIGHT = 150;
-const PADDING = { left: 36, right: 10, top: 10, bottom: 24 };
+/*
+ * The viewBox is sized close to the width this actually renders at, because an
+ * SVG scales its whole coordinate system to fit — including text. At 640 units
+ * wide in a ~1160px container every `11px` label was drawn at ~20px and the
+ * axis read as display type.
+ */
+const VIEW_WIDTH = 1100;
+const VIEW_HEIGHT = 300;
+const PADDING = { left: 52, right: 16, top: 16, bottom: 40 };
 const PLOT_WIDTH = VIEW_WIDTH - PADDING.left - PADDING.right;
 const PLOT_HEIGHT = VIEW_HEIGHT - PADDING.top - PADDING.bottom;
 
@@ -71,12 +77,12 @@ export function HistoryChart({ history, breakEvenPct }: HistoryChartProps) {
           <defs>
             <pattern
               id="withheld-hatch"
-              width="6"
-              height="6"
+              width="9"
+              height="9"
               patternTransform="rotate(135)"
               patternUnits="userSpaceOnUse"
             >
-              <line x1="0" y1="0" x2="0" y2="6" stroke="var(--color-rule-strong)" strokeWidth="1.4" />
+              <line x1="0" y1="0" x2="0" y2="9" stroke="var(--color-rule-strong)" strokeWidth="1.6" />
             </pattern>
           </defs>
 
@@ -102,14 +108,24 @@ export function HistoryChart({ history, breakEvenPct }: HistoryChartProps) {
             ),
           )}
 
+          {/* Everything above the dashed line is soiling a wash would pay to
+              remove. Shading it means "is this plant worth cleaning" can be
+              answered by where the line sits, without reading a number. */}
+          <rect
+            x={PADDING.left}
+            y={PADDING.top}
+            width={VIEW_WIDTH - PADDING.left - PADDING.right}
+            height={Math.max(0, breakEvenY - PADDING.top)}
+            fill="var(--color-signal-wash)"
+          />
           <line
             x1={PADDING.left}
             y1={breakEvenY}
             x2={VIEW_WIDTH - PADDING.right}
             y2={breakEvenY}
             stroke="var(--color-signal)"
-            strokeWidth="1.5"
-            strokeDasharray="5 4"
+            strokeWidth="2"
+            strokeDasharray="7 5"
           />
 
           {segments.map((segment) =>
@@ -120,8 +136,8 @@ export function HistoryChart({ history, breakEvenPct }: HistoryChartProps) {
                 key={`series-${segment[0].index}`}
                 cx={x(segment[0].index)}
                 cy={y(segment[0].value)}
-                r="2.5"
-                fill="var(--color-ink-soft)"
+                r="3.5"
+                fill="var(--color-ink)"
               />
             ) : (
               <polyline
@@ -130,8 +146,8 @@ export function HistoryChart({ history, breakEvenPct }: HistoryChartProps) {
                   .map(({ index, value }) => `${x(index).toFixed(1)},${y(value).toFixed(1)}`)
                   .join(" ")}
                 fill="none"
-                stroke="var(--color-ink-soft)"
-                strokeWidth="2"
+                stroke="var(--color-ink)"
+                strokeWidth="2.5"
                 strokeLinejoin="round"
                 strokeLinecap="round"
               />
@@ -155,22 +171,22 @@ export function HistoryChart({ history, breakEvenPct }: HistoryChartProps) {
               y1={PADDING.top}
               x2={x(hoverIndex as number)}
               y2={PADDING.top + PLOT_HEIGHT}
-              stroke="var(--color-ink)"
-              strokeWidth="1"
+              stroke="var(--color-ink-faint)"
+              strokeWidth="1.5"
             />
           )}
           {hovered && hovered.flag === "USABLE" && hovered.soiling_loss_pct !== null && (
             <circle
               cx={x(hoverIndex as number)}
               cy={y(hovered.soiling_loss_pct)}
-              r="4"
+              r="5.5"
               fill="var(--color-surface)"
-              stroke="var(--color-ink)"
-              strokeWidth="2"
+              stroke="var(--color-signal)"
+              strokeWidth="2.5"
             />
           )}
 
-          <text x="0" y={PADDING.top + 4} className="fill-ink-faint text-[11px]">
+          <text x="0" y={PADDING.top + 10} className="fill-ink-faint text-[11px]">
             {axisMax.toFixed(1)}%
           </text>
           <text x="0" y={PADDING.top + PLOT_HEIGHT} className="fill-ink-faint text-[11px]">
@@ -178,14 +194,14 @@ export function HistoryChart({ history, breakEvenPct }: HistoryChartProps) {
           </text>
           <text
             x={PADDING.left}
-            y={VIEW_HEIGHT - 6}
+            y={VIEW_HEIGHT - 12}
             className="fill-ink-faint text-[11px]"
           >
             {formatDateShort(history[0].date)}
           </text>
           <text
             x={VIEW_WIDTH - PADDING.right}
-            y={VIEW_HEIGHT - 6}
+            y={VIEW_HEIGHT - 12}
             textAnchor="end"
             className="fill-ink-faint text-[11px]"
           >
@@ -215,12 +231,12 @@ export function HistoryChart({ history, breakEvenPct }: HistoryChartProps) {
       </div>
 
       <figcaption className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-ink-faint">
-        <LegendKey swatch={<span className="h-0.5 w-4 bg-ink-soft" />} label="soiling" />
+        <LegendKey swatch={<span className="h-0.5 w-4 bg-ink" />} label="soiling" />
         <LegendKey
           swatch={
             <span className="h-0 w-4 border-t-2 border-dashed border-signal" aria-hidden />
           }
-          label={`break-even ${formatPct(breakEvenPct)}`}
+          label={`break-even ${formatPct(breakEvenPct)} — shaded above is worth cleaning`}
         />
         <LegendKey
           swatch={
@@ -247,16 +263,16 @@ export function HistoryChart({ history, breakEvenPct }: HistoryChartProps) {
 function EventTick({ x, kind }: { x: number; kind: "rain" | "cleaned" }) {
   const baseline = PADDING.top + PLOT_HEIGHT;
   if (kind === "cleaned") {
-    return <rect x={x - 2.5} y={baseline - 5} width="5" height="5" fill="var(--color-ink)" />;
+    return <rect x={x - 3.5} y={baseline - 7} width="7" height="7" fill="var(--color-ink)" />;
   }
   return (
     <line
       x1={x}
       y1={baseline}
       x2={x}
-      y2={baseline - 6}
+      y2={baseline - 9}
       stroke="var(--color-ink-faint)"
-      strokeWidth="1.5"
+      strokeWidth="2"
     />
   );
 }

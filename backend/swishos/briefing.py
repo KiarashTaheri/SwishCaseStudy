@@ -144,10 +144,10 @@ def _template_briefing(facts: dict[str, Any]) -> Briefing:
     if status == "BELOW_BREAK_EVEN":
         days = facts.get("days_to_break_even")
         arrival = (
-            f" At {_rate(facts.get('accumulation_rate_pct_per_day'))} it crosses "
-            f"in about {days:.1f} days."
+            f" It is losing {_rate(facts.get('accumulation_rate_pct_per_day'))}, "
+            f"so it becomes worth cleaning in about {days:.1f} days."
             if isinstance(days, (int, float))
-            else " No accumulation rate could be measured, so no crossing date is given."
+            else " No soiling rate could be measured, so no crossing date is given."
         )
         headline = (
             f"{name}: hold — soiling {_pct(soiling)} against a "
@@ -228,9 +228,16 @@ def _pp(value: Any) -> str:
 
 
 def _rate(value: Any) -> str:
-    return (
-        f"{value:.3f}pp/day" if isinstance(value, (int, float)) else "the measured rate"
-    )
+    """The accumulation rate, in words rather than in units.
+
+    "0.090pp/day" is correct and unreadable — `pp` means percentage *points*,
+    the difference between two percentages, which is exactly the distinction a
+    reader has to already know in order to parse it. The same number said as a
+    share of output lost per day needs no glossary.
+    """
+    if not isinstance(value, (int, float)):
+        return "an unmeasured amount per day"
+    return f"another {value:.2f}% of its output each day"
 
 
 def _usd(value: Any) -> str:

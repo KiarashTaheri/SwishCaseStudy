@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { IBM_Plex_Sans, IBM_Plex_Serif } from "next/font/google";
+import { AppShell } from "@/components/AppShell";
 import "./globals.css";
 
 /*
@@ -41,7 +42,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       lang="en"
       className={`${plexSans.variable} ${plexSerif.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col font-sans">{children}</body>
+      <body className="min-h-full font-sans">
+        <AppShell>{children}</AppShell>
+      </body>
     </html>
   );
 }
