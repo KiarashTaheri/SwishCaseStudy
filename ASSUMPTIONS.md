@@ -77,7 +77,7 @@ Referenced from the decision log as `[A#]`.
 | **Assumption** | Crew `day_rate_usd` is already inside `cleaning_cost_usd` and must not be added again. |
 | **Source** | *Not stated anywhere in the brief* — a guess, and the one I am least comfortable with. *Measured* evidence below is genuinely ambiguous. |
 | **Rejected** | Adding `day_rate_usd` on top. If crew cost were additional, Rajasthan cleaning would cost nearly double its stated figure, which seems unlikely — but the evidence does not settle it. |
-| **Cost** | Costs understated by up to ~97% in the worst region. Only 4 of 12 plants currently show positive `recoverable_usd`; the two marginal ones (`plant_1006` +$4,228, `plant_1001` +$3,361) would flip negative and the recommendation would change. |
+| **Cost** | *Measured*: adding each plant's suggested crew-days at its region's day rate flips **2 of the 4 current recommendations** negative — `plant_1005` +$224 → −$3,914 (3.0 crew-days × $1,379) and `plant_1006` +$3,409 → −$10,255 (5.3 × $2,578). `plant_1000` and `plant_1008` survive. So the ambiguity does not merely shift the numbers; it halves tomorrow's dispatch list. |
 | **Falsifier** | One email. The brief invites questions and this is what I would spend one on. |
 
 Implied crew cost (`day_rate_usd / mw_per_day`) against `cleaning_cost_usd / capacity_mw`:

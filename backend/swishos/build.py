@@ -13,14 +13,19 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import gates
+from . import gates, ranking, repository
 from .db import apply_schema, connect
 from .ingest import IngestError, ingest_dataset
 from .quality import GateSummary, apply_quality_gate
 
 
 def build(data_dir: Path, database_path: Path) -> GateSummary:
-    """Load the CSVs and materialise quality verdicts. Safe to re-run."""
+    """Load the CSVs, gate them, and materialise the ranking. Safe to re-run.
+
+    The three stages run in order because each consumes the last one's output.
+    `dispatch` is deliberately untouched: it holds human decisions, not derived
+    data, so a rebuild must not erase it.
+    """
     connection = connect(database_path)
     try:
         apply_schema(connection)
@@ -29,9 +34,55 @@ def build(data_dir: Path, database_path: Path) -> GateSummary:
             f"ingested {summary.plants} plants, {summary.crews} crews, "
             f"{summary.daily_readings:,} daily readings, {summary.events:,} events"
         )
-        return apply_quality_gate(connection)
+        gate_summary = apply_quality_gate(connection)
+        _build_snapshot(connection)
+        return gate_summary
     finally:
         connection.close()
+
+
+def _build_snapshot(connection) -> None:
+    """Rank the fleet for the latest day and store it.
+
+    Only the latest day. Backfilling every date is a backtest, not a build, and
+    it is 120x the work for a view nobody opens.
+    """
+    as_of = repository.latest_reading_date(connection)
+    if as_of is None:
+        print("\nno readings ingested, so no ranking to build")
+        return
+
+    plants = repository.load_plants(connection)
+    crews = repository.load_crews(connection)
+
+    coverage = ranking.verify_crew_coverage(plants, crews)
+    for issue, regions in coverage.items():
+        if regions:
+            print(
+                f"  WARNING: {issue.replace('_', ' ')}: {', '.join(regions)} "
+                "(see ASSUMPTIONS.md A14)",
+                file=sys.stderr,
+            )
+
+    fleet = ranking.rank_fleet(
+        plants,
+        crews,
+        repository.readings_by_plant(connection),
+        repository.events_by_plant(connection),
+        as_of,
+    )
+    rows = ranking.build_snapshot(connection, fleet)
+    print(
+        f"\nranked {rows} plants as of {as_of}: "
+        f"{fleet.actionable} actionable, "
+        f"${fleet.total_recoverable_usd:,.2f} recoverable"
+    )
+    for region in fleet.regions:
+        print(
+            f"  {region.region:<18} {len(region.recommendations)} to clean, "
+            f"{region.crew_days_outstanding:>5.1f} crew-days against "
+            f"{len(region.crews)} crew"
+        )
 
 
 def main(argv: list[str] | None = None) -> int:

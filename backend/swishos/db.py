@@ -9,8 +9,13 @@ Postgres.
 
 Table layout follows DDIA ch.17's separation of source data from derived data:
 `plant`, `crew`, `daily_reading` and `plant_day_event` mirror the CSVs verbatim
-and are never mutated by later stages. `reading_quality` is derived output and
-can always be dropped and recomputed from the tables above.
+and are never mutated by later stages. `reading_quality` and `ranking_snapshot`
+are derived output and can always be dropped and recomputed from the tables
+above.
+
+`dispatch` is the exception that proves the rule: it sits at the end of the
+pipeline but is *source* data, because it records a decision a human made. It is
+the only table a rebuild must not touch.
 """
 
 from __future__ import annotations
@@ -68,10 +73,63 @@ CREATE TABLE IF NOT EXISTS reading_quality (
     FOREIGN KEY (plant_id, date) REFERENCES daily_reading(plant_id, date)
 );
 
+-- Derived from everything above. The stated load is ~120 people opening the
+-- fleet view after 8am; the ranking is a pure function of data through
+-- yesterday and cannot change during the day, so it is computed once and read
+-- from here. Caching with the hard part removed — the key is the date, so there
+-- is no invalidation problem. Safe to drop and rebuild.
+CREATE TABLE IF NOT EXISTS ranking_snapshot (
+    as_of                         TEXT    NOT NULL,
+    plant_id                      TEXT    NOT NULL REFERENCES plant(plant_id),
+    region                        TEXT    NOT NULL,
+    rank_in_region                INTEGER,
+    status                        TEXT    NOT NULL,
+    soiling_loss_pct              REAL,
+    break_even_soiling_pct        REAL,
+    margin_pct                    REAL,
+    recoverable_usd               REAL,
+    cleaning_cost_usd             REAL    NOT NULL,
+    expected_energy_kwh_per_day   REAL    NOT NULL,
+    tariff_per_kwh                REAL    NOT NULL,
+    days_until_next_reset         INTEGER NOT NULL,
+    accumulation_rate_pct_per_day REAL,
+    days_to_break_even            REAL,
+    usable_days                   INTEGER NOT NULL,
+    days_since_reset              INTEGER,
+    last_reset_on                 TEXT,
+    withheld_days_last_14         INTEGER NOT NULL,
+    suggested_crew                TEXT,
+    PRIMARY KEY (as_of, plant_id)
+);
+
+-- NOT derived data, despite sitting downstream of it. A dispatch is a human
+-- decision to spend money, so it cannot be recomputed from the CSVs and must
+-- survive `python -m swishos.build` dropping and rebuilding everything else.
+--
+-- `snapshot_json` stores the numbers the decision was made on. The estimate
+-- moves daily, so when a cleaning under-recovers the only useful question is
+-- what was believed at the time — unanswerable without this column.
+CREATE TABLE IF NOT EXISTS dispatch (
+    dispatch_id   TEXT PRIMARY KEY,
+    plant_id      TEXT NOT NULL REFERENCES plant(plant_id),
+    as_of         TEXT NOT NULL,
+    created_at    TEXT NOT NULL,
+    crew_id       TEXT NOT NULL REFERENCES crew(crew_id),
+    crew_days     REAL NOT NULL,
+    snapshot_json TEXT NOT NULL,
+    work_order    TEXT NOT NULL,
+    -- One dispatch per plant per day. The crew can only clean it once, and a
+    -- double-booking is a wasted truck, so the constraint lives in the schema
+    -- rather than in a check the API could forget to run.
+    UNIQUE (plant_id, as_of)
+);
+
 -- The fleet view always reads the most recent days across all plants, so date
 -- leads the index. Plant detail views are served by the primary key.
 CREATE INDEX IF NOT EXISTS idx_daily_reading_date ON daily_reading(date);
 CREATE INDEX IF NOT EXISTS idx_reading_quality_flag ON reading_quality(flag);
+CREATE INDEX IF NOT EXISTS idx_snapshot_region ON ranking_snapshot(as_of, region);
+CREATE INDEX IF NOT EXISTS idx_dispatch_as_of ON dispatch(as_of);
 """
 
 

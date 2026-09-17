@@ -41,6 +41,21 @@ class EstimateStatus(str, Enum):
     INSUFFICIENT_HISTORY = "INSUFFICIENT_HISTORY"
 
 
+class DispatchStatus(str, Enum):
+    """Whether a plant is worth cleaning tomorrow.
+
+    Three values rather than a boolean, because "no" has two very different
+    meanings to the asset manager: `BELOW_BREAK_EVEN` is a plant the system
+    understands and is telling her to wait on, while `INSUFFICIENT_HISTORY` is a
+    plant it has no opinion about. Collapsing them would hide the second, which
+    is the one she may need to act on by other means.
+    """
+
+    ACTIONABLE = "ACTIONABLE"
+    BELOW_BREAK_EVEN = "BELOW_BREAK_EVEN"
+    INSUFFICIENT_HISTORY = "INSUFFICIENT_HISTORY"
+
+
 @dataclass(frozen=True)
 class Plant:
     plant_id: str

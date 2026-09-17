@@ -1,4 +1,15 @@
-# The ingest and quality-gate layer runs on the standard library alone —
-# sqlite3 and csv ship with Python. Nothing here is needed to build the
-# database or run the gate; these are for the test suite and the API layer.
+# The pipeline — ingest, quality gate, estimator, economics, ranking — runs on
+# the standard library alone: sqlite3 and csv ship with Python. Everything here
+# is for serving it or testing it.
+fastapi==0.120.4
+uvicorn==0.39.0
+httpx==0.28.1          # FastAPI's TestClient transport
 pytest==9.1.1
+
+# `anthropic` is deliberately absent. The brief requires the system to run
+# without an API key, so the LLM path is optional by construction: with no key
+# or no package, every briefing falls back to its deterministic template and
+# reports source="template". Installing the SDK by default would imply a
+# dependency that does not exist.
+#
+#     pip install anthropic     # only if you want the enhanced prose
