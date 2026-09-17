@@ -1,0 +1,11 @@
+[project]
+name = "swishos"
+version = "0.1.0"
+description = "Fleet soiling and cleaning advisor"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+# Tests import `swishos` from the backend root rather than an installed
+# package, so a clean clone can run them without a build step.
+pythonpath = ["."]
+testpaths = ["tests"]

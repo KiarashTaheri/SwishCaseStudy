@@ -1,0 +1,95 @@
+"""SQLite connection management and schema.
+
+Why SQLite: at the stated end state (200 plants x 5 years retention) the daily
+rollups are 365,000 rows and 43.6 MB on disk, with the fleet ranking query
+measured at 32 ms. The deployment constraint is that the system runs from a
+clean clone with no hosted services, and `sqlite3` ships with Python. See
+DECISIONS.md #4 for the benchmark and for the conditions that would force
+Postgres.
+
+Table layout follows DDIA ch.17's separation of source data from derived data:
+`plant`, `crew`, `daily_reading` and `plant_day_event` mirror the CSVs verbatim
+and are never mutated by later stages. `reading_quality` is derived output and
+can always be dropped and recomputed from the tables above.
+"""
+
+from __future__ import annotations
+
+import sqlite3
+from pathlib import Path
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS plant (
+    plant_id              TEXT    PRIMARY KEY,
+    name                  TEXT    NOT NULL,
+    region                TEXT    NOT NULL,
+    capacity_mw           REAL    NOT NULL,
+    tariff_per_kwh        REAL    NOT NULL,
+    cleaning_cost_usd     REAL    NOT NULL,
+    days_until_next_reset INTEGER NOT NULL,
+    commissioned_on       TEXT    NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS crew (
+    crew_id      TEXT PRIMARY KEY,
+    home_base    TEXT NOT NULL,
+    mw_per_day   REAL NOT NULL,
+    day_rate_usd REAL NOT NULL
+);
+
+-- pr and soiling_loss_pct are nullable on purpose: the source publishes blanks
+-- where no clean baseline exists yet, and coercing those to 0.0 would read as a
+-- perfectly clean plant.
+CREATE TABLE IF NOT EXISTS daily_reading (
+    plant_id            TEXT NOT NULL REFERENCES plant(plant_id),
+    date                TEXT NOT NULL,
+    energy_kwh          REAL NOT NULL,
+    expected_energy_kwh REAL NOT NULL,
+    pr                  REAL,
+    soiling_loss_pct    REAL,
+    PRIMARY KEY (plant_id, date)
+);
+
+CREATE TABLE IF NOT EXISTS plant_day_event (
+    plant_id TEXT    NOT NULL REFERENCES plant(plant_id),
+    date     TEXT    NOT NULL,
+    rain_mm  REAL    NOT NULL,
+    cleaned  INTEGER NOT NULL CHECK (cleaned IN (0, 1)),
+    PRIMARY KEY (plant_id, date)
+);
+
+-- Derived from daily_reading by the quality gate. Safe to drop and rebuild.
+CREATE TABLE IF NOT EXISTS reading_quality (
+    plant_id TEXT NOT NULL,
+    date     TEXT NOT NULL,
+    flag     TEXT NOT NULL,
+    detail   TEXT,
+    PRIMARY KEY (plant_id, date),
+    FOREIGN KEY (plant_id, date) REFERENCES daily_reading(plant_id, date)
+);
+
+-- The fleet view always reads the most recent days across all plants, so date
+-- leads the index. Plant detail views are served by the primary key.
+CREATE INDEX IF NOT EXISTS idx_daily_reading_date ON daily_reading(date);
+CREATE INDEX IF NOT EXISTS idx_reading_quality_flag ON reading_quality(flag);
+"""
+
+
+def connect(database_path: Path | str) -> sqlite3.Connection:
+    """Open a connection with the pragmas this system depends on.
+
+    WAL is required, not cosmetic: readers must not block on the daily ingest
+    write. Foreign keys are off by default in SQLite and must be enabled per
+    connection, so the REFERENCES clauses above are inert without this.
+    """
+    connection = sqlite3.connect(str(database_path))
+    connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA journal_mode=WAL")
+    connection.execute("PRAGMA foreign_keys=ON")
+    return connection
+
+
+def apply_schema(connection: sqlite3.Connection) -> None:
+    """Create tables and indexes if absent. Safe to run on every startup."""
+    connection.executescript(SCHEMA)
+    connection.commit()

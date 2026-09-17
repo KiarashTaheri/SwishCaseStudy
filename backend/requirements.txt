@@ -1,0 +1,4 @@
+# The ingest and quality-gate layer runs on the standard library alone —
+# sqlite3 and csv ship with Python. Nothing here is needed to build the
+# database or run the gate; these are for the test suite and the API layer.
+pytest==9.1.1
