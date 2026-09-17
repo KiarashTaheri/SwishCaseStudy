@@ -3,8 +3,8 @@ import type { Verdict } from "@/lib/decision";
 import { formatDate, formatDays, formatUsd } from "@/lib/format";
 
 /**
- * The words attached to each verdict, in one place so the row, the drawer and
- * the confirmation cannot describe the same plant differently.
+ * The words attached to each verdict, in one place so the table, the detail
+ * page and the confirmation cannot describe the same plant differently.
  */
 
 /** Two or three words, sitting above the margin figure. */
@@ -54,9 +54,13 @@ export function verdictDetail(verdict: Verdict, plant: PlantRow): string {
 }
 
 function insufficientHistoryReason(plant: PlantRow, usableDays: number): string {
-  const dayWord = usableDays === 1 ? "day" : "days";
+  // Not "three days are needed" — that described the 3-day median the estimator
+  // used to run and no longer does. Today's reading is the estimate, so the only
+  // way to have none is for today's reading to be blank or withheld.
   const since = plant.last_reset_on
-    ? ` since the reset on ${formatDate(plant.last_reset_on)}`
+    ? `, last cleaned or rained on ${formatDate(plant.last_reset_on)}`
     : "";
-  return `${usableDays} usable ${dayWord}${since}; three are needed before soiling can be separated from noise.`;
+  return usableDays === 0
+    ? `Today's reading was withheld or has no clean baseline to compare against${since}, so there is no soiling figure to act on.`
+    : `Standing on ${usableDays} usable reading${since}.`;
 }

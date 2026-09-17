@@ -12,7 +12,7 @@ Those are the same statement, and the code computes both because they are not
 equally useful to a human. A dollar total cannot be checked by eye; "2.29 points
 past where cleaning pays for itself" can, against a plant whose soiling the asset
 manager can see on a chart. So `margin_pct` leads the interface and the dollars
-follow it. See DECISIONS.md #5.
+follow it. See DECISIONS.md #1.
 
 Why the accumulation rate `r` is absent from the value
 ------------------------------------------------------

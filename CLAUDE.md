@@ -128,7 +128,9 @@ method works.
   backend, frontend.
 - `ASSUMPTIONS.md` — A1–A15, each with source, what breaks if false, and how to settle it.
 - `questions.md` — seven open questions for the organisers, with the assumption being used meanwhile.
-- `DECISIONS.md` — **not yet written**, though `db.py` already cites "DECISIONS.md #4". Required
-  schema is four fields per decision: **Decision** (what you did), **Rejected** (what else you
-  considered and why it lost), **Cost** (what this makes worse), **Falsifier** (what would change
-  your mind). Graders read it before the code.
+- `DECISIONS.md` — eleven decisions, each with the brief's four fields in order: **Decision** (what
+  you did), **Rejected** (what else you considered and why it lost), **Cost** (what this makes
+  worse), **Falsifier** (what would change your mind). Graders read it before the code.
+  **The numbering is load-bearing** — `economics.py`, `db.py`, `repository.py`, `ranking.py`,
+  `briefing.py`, `verify.py` and two tests cite decisions by number. Renumbering breaks those
+  citations, so add at the end rather than inserting.

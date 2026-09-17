@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { fetchPlant, type DataSource } from "@/lib/api";
 import type { PlantDetail } from "@/lib/contract";
 import { verdictFor } from "@/lib/decision";
+import { verdictDetail, verdictTitle } from "@/lib/copy";
 import { formatDate, formatPct, formatPoints, formatUsd } from "@/lib/format";
 
 type State =
@@ -101,6 +102,18 @@ export default function PlantPage() {
       />
 
       <main className="min-w-0 px-6 pb-10">
+        {/* The one sentence a person can check against the figures below it,
+            and the only place that says WHEN a plant below break-even becomes
+            worth cleaning. */}
+        <div className="mt-6 rounded-lg border border-rule bg-surface px-4 py-3">
+          <p className="text-[13px] font-semibold text-ink-strong">
+            {verdictTitle(verdict)}
+          </p>
+          <p className="mt-0.5 text-[13.5px] text-ink-soft">
+            {verdictDetail(verdict, plant)}
+          </p>
+        </div>
+
         <SectionLabel>What the decision rests on</SectionLabel>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <KpiCard
